@@ -11,6 +11,7 @@ enum AppointmentStatus {
   AGENDADO
   LAVANDO
   ENTREGUE
+  CANCELADO
 }
 
 enum PaymentStatus {

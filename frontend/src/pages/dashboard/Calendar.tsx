@@ -17,7 +17,9 @@ import { listAppointments, type Appointment } from "../../api/appointments";
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
-import { Link } from "react-router-dom";
+import { NewAppointmentModal } from "../../components/modals/NewAppointmentModal";
+import { AppointmentDetailsModal } from "../../components/modals/AppointmentDetailsModal";
+import { EditAppointmentModal } from "../../components/modals/EditAppointmentModal";
 
 const WORK_START_HOUR = 8;
 const WORK_END_HOUR = 18;
@@ -36,6 +38,10 @@ export function DashboardCalendar() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const visibleRange = useMemo(() => {
     const start = startOfWeek(anchorDate, { weekStartsOn: 1 });
@@ -43,27 +49,28 @@ export function DashboardCalendar() {
     return { start, end };
   }, [anchorDate]);
 
-  useEffect(() => {
-    async function loadAppointments() {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await listAppointments({
-          start: visibleRange.start.toISOString(),
-          end: visibleRange.end.toISOString()
-        });
-        setAppointments(
-          data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        );
-      } catch (err) {
-        console.error(err);
-        setError("Não foi possível carregar os agendamentos.");
-      } finally {
-        setLoading(false);
-      }
+  async function loadAppointments() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listAppointments({
+        start: visibleRange.start.toISOString(),
+        end: visibleRange.end.toISOString()
+      });
+      setAppointments(
+        data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      );
+    } catch (err) {
+      console.error(err);
+      setError("Não foi possível carregar os agendamentos.");
+    } finally {
+      setLoading(false);
     }
+  }
 
+  useEffect(() => {
     loadAppointments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleRange.start, visibleRange.end]);
 
   const daysOfWeek = useMemo(
@@ -99,8 +106,11 @@ export function DashboardCalendar() {
       <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-2 border-blue-300/30 shadow-xl lg:w-72 flex-shrink-0 h-full flex flex-col overflow-hidden">
         <CardHeader className="space-y-4 border-b border-primary/20 pb-4 flex-shrink-0">
           <CardTitle className="text-xl font-bold text-secondary-900">Agenda</CardTitle>
-          <Button asChild className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-lg">
-            <Link to="/dashboard/novo-agendamento">Novo agendamento</Link>
+          <Button 
+            onClick={() => setIsNewAppointmentOpen(true)}
+            className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-lg"
+          >
+            Novo agendamento
           </Button>
         </CardHeader>
         <CardContent className="space-y-6 pt-6 flex-1 overflow-y-auto">
@@ -309,7 +319,11 @@ export function DashboardCalendar() {
                           return (
                             <div
                               key={appointment.id}
-                              className="absolute left-2 right-2 rounded-xl border-2 border-primary/40 bg-gradient-to-br from-primary/20 to-primary/10 p-3 text-sm shadow-lg hover:shadow-xl transition-all cursor-pointer"
+                              onClick={() => {
+                                setSelectedAppointment(appointment);
+                                setIsDetailsOpen(true);
+                              }}
+                              className="absolute left-2 right-2 rounded-xl border-2 border-primary/40 bg-gradient-to-br from-primary/20 to-primary/10 p-3 text-sm shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]"
                               style={{
                                 top: `${top}%`,
                                 height: `${Math.max(height, 12)}%`
@@ -336,8 +350,65 @@ export function DashboardCalendar() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modais */}
+      <NewAppointmentModal
+        isOpen={isNewAppointmentOpen}
+        onClose={() => setIsNewAppointmentOpen(false)}
+        initialDate={anchorDate}
+        onSuccess={() => {
+          loadAppointments();
+        }}
+      />
+
+      <AppointmentDetailsModal
+        isOpen={isDetailsOpen}
+        onClose={() => {
+          setIsDetailsOpen(false);
+          setSelectedAppointment(null);
+        }}
+        appointment={selectedAppointment}
+        onUpdate={() => {
+          loadAppointments();
+        }}
+        onEdit={(appointment) => {
+          setSelectedAppointment(appointment);
+          setIsEditOpen(true);
+        }}
+      />
+
+      <EditAppointmentModal
+        isOpen={isEditOpen}
+        onClose={() => {
+          setIsEditOpen(false);
+          setSelectedAppointment(null);
+        }}
+        appointment={selectedAppointment}
+        onSuccess={() => {
+          loadAppointments();
+        }}
+      />
     </div>
   );
+
+  async function loadAppointments() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listAppointments({
+        start: visibleRange.start.toISOString(),
+        end: visibleRange.end.toISOString()
+      });
+      setAppointments(
+        data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      );
+    } catch (err) {
+      console.error(err);
+      setError("Não foi possível carregar os agendamentos.");
+    } finally {
+      setLoading(false);
+    }
+  }
 }
 
 

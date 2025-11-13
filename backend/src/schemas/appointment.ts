@@ -8,7 +8,13 @@ export const createAppointmentSchema = z.object({
 });
 
 export const updateAppointmentStatusSchema = z.object({
-  status: z.enum(["AGENDADO", "LAVANDO", "ENTREGUE"])
+  status: z.enum(["AGENDADO", "LAVANDO", "ENTREGUE", "CANCELADO"])
+});
+
+export const updateAppointmentSchema = z.object({
+  serviceId: z.string().cuid().optional(),
+  date: z.string().datetime({ offset: true }).optional(),
+  notes: z.string().optional()
 });
 
 export const availabilityQuerySchema = z.object({

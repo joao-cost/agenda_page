@@ -4,7 +4,8 @@ import { prisma } from "../lib/prisma";
 import {
   availabilityQuerySchema,
   createAppointmentSchema,
-  updateAppointmentStatusSchema
+  updateAppointmentStatusSchema,
+  updateAppointmentSchema
 } from "../schemas/appointment";
 import { notifyNewAppointment, notifyStatusChange } from "../services/whatsapp.service";
 import { addMinutes, endOfDay, format, isBefore, setHours, setMilliseconds, setMinutes, setSeconds, startOfDay } from "date-fns";
@@ -258,6 +259,63 @@ export const appointmentController = {
     }
 
     return res.json(serializeAppointment(appointment));
+  },
+
+  async update(req: Request, res: Response) {
+    const { id } = req.params;
+    const parseResult = updateAppointmentSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ message: parseResult.error.flatten() });
+    }
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: { client: true, service: true, payment: true }
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Agendamento não encontrado." });
+    }
+
+    const updateData: any = {};
+
+    if (parseResult.data.serviceId) {
+      const service = await prisma.service.findUnique({
+        where: { id: parseResult.data.serviceId }
+      });
+      if (!service) {
+        return res.status(404).json({ message: "Serviço não encontrado." });
+      }
+      updateData.serviceId = parseResult.data.serviceId;
+      
+      // Atualizar valor do pagamento se o serviço mudou
+      if (appointment.payment) {
+        await prisma.payment.update({
+          where: { id: appointment.payment.id },
+          data: { amount: service.price }
+        });
+      }
+    }
+
+    if (parseResult.data.date) {
+      updateData.date = new Date(parseResult.data.date);
+    }
+
+    if (parseResult.data.notes !== undefined) {
+      updateData.notes = parseResult.data.notes;
+    }
+
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id },
+      data: updateData,
+      include: {
+        client: true,
+        service: true,
+        payment: true
+      }
+    });
+
+    return res.json(serializeAppointment(updatedAppointment));
   }
 };
 

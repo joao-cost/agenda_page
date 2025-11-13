@@ -27,6 +27,15 @@ export async function updateAppointmentStatus(id: string, status: AppointmentSta
   return data;
 }
 
+export async function updateAppointment(id: string, payload: {
+  serviceId?: string;
+  date?: string;
+  notes?: string;
+}) {
+  const { data } = await api.patch<Appointment>(`/appointments/${id}`, payload);
+  return data;
+}
+
 export interface AvailabilityResponse {
   date: string;
   serviceId: string;

@@ -26,7 +26,7 @@ export interface Service {
   durationMin: number;
 }
 
-export type AppointmentStatus = "AGENDADO" | "LAVANDO" | "ENTREGUE";
+export type AppointmentStatus = "AGENDADO" | "LAVANDO" | "ENTREGUE" | "CANCELADO";
 
 export interface Payment {
   id: string;
