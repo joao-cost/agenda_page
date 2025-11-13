@@ -1,0 +1,27 @@
+{
+  "name": "lavacar-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -r \"npm:dev:*\"",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev:backend": "npm --workspace backend run dev",
+    "lint": "npm --workspaces run lint",
+    "format": "npm --workspaces run format",
+    "build": "npm --workspaces run build",
+    "test": "npm --workspaces run test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.18.0",
+    "npm": ">=9.0.0"
+  }
+}
+
+

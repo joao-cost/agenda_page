@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lavacar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lavacar}
+      POSTGRES_DB: ${POSTGRES_DB:-lavacar}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://lavacar:lavacar@db:5432/lavacar?schema=public}
+      JWT_SECRET: ${JWT_SECRET:-changeme}
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-https://api.example.com}
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-token}
+      NODE_ENV: ${NODE_ENV:-development}
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    env_file:
+      - ./frontend/.env
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  postgres-data:
+
+

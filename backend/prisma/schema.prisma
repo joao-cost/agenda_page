@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppointmentStatus {
+  AGENDADO
+  LAVANDO
+  ENTREGUE
+}
+
+enum PaymentStatus {
+  PENDENTE
+  PAGO
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+}
+
+model User {
+  id        String   @id @default(cuid())
+  login     String   @unique
+  password  String
+  name      String?
+  role      UserRole @default(ADMIN)
+  clientId  String?  @unique
+  client    Client?  @relation(fields: [clientId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id             String         @id @default(cuid())
+  name           String
+  phone          String
+  vehicle        String
+  notes          String?
+  approved       Boolean        @default(false)
+  appointments   Appointment[]
+  user           User?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Service {
+  id             String         @id @default(cuid())
+  name           String         @unique
+  description    String?
+  price          Decimal
+  durationMin    Int
+  appointments   Appointment[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Appointment {
+  id            String           @id @default(cuid())
+  date          DateTime
+  status        AppointmentStatus @default(AGENDADO)
+  notes         String?
+
+  clientId      String
+  client        Client           @relation(fields: [clientId], references: [id])
+
+  serviceId     String
+  service       Service          @relation(fields: [serviceId], references: [id])
+
+  payment       Payment?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model Payment {
+  id             String         @id @default(cuid())
+  status         PaymentStatus  @default(PENDENTE)
+  amount         Decimal
+  paidAt         DateTime?
+  appointmentId  String         @unique
+  appointment    Appointment     @relation(fields: [appointmentId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model IntegrationSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

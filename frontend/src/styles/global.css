@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  @apply bg-surface text-secondary-900;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-shell {
+  @apply mx-auto w-full max-w-6xl rounded-[28px] bg-gradient-to-br from-white via-white to-primary/5 p-8 shadow-2xl shadow-secondary-900/10 ring-2 ring-primary/20 backdrop-blur;
+}
+
+.dashboard-shell > * + * {
+  @apply mt-6;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out;
+}
+
+.animate-gradient {
+  animation: gradient 3s ease infinite;
+}
+
+/* React Day Picker Styles */
+.rdp {
+  --rdp-cell-size: 40px;
+  --rdp-accent-color: #279AF1;
+  --rdp-background-color: #f7f7ff;
+  margin: 0;
+}
+
+.rdp-button_reset {
+  appearance: none;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rdp-button {
+  border: 2px solid transparent;
+}
+
+.rdp-day_selected,
+.rdp-day_selected:focus-visible,
+.rdp-day_selected:hover {
+  color: white !important;
+  opacity: 1;
+  background: linear-gradient(to right, #279AF1, #0B5563) !important;
+  font-weight: bold;
+}
+
+
