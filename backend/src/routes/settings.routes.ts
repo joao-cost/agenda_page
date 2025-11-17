@@ -6,6 +6,8 @@ const settingsRoutes = Router();
 
 settingsRoutes.use(ensureAuthenticated({ adminOnly: true }));
 
+settingsRoutes.get("/general", settingsController.getGeneral);
+settingsRoutes.put("/general", settingsController.updateGeneral);
 settingsRoutes.get("/evolution", settingsController.getEvolution);
 settingsRoutes.put("/evolution", settingsController.updateEvolution);
 

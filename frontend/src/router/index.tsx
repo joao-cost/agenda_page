@@ -8,7 +8,8 @@ import { DashboardClients } from "../pages/dashboard/Clients";
 import { DashboardReports } from "../pages/dashboard/Reports";
 import { DashboardNewAppointment } from "../pages/dashboard/NewAppointment";
 import { DashboardCalendar } from "../pages/dashboard/Calendar";
-import { DashboardIntegrations } from "../pages/dashboard/Integrations";
+import { DashboardSettings } from "../pages/dashboard/Settings";
+import { ClientHistory } from "../pages/dashboard/ClientHistory";
 import { AuthPage } from "../pages/Auth";
 import { useAuthStore } from "../store/auth";
 
@@ -30,6 +31,14 @@ const routes: RouteObject[] = [
     )
   },
   {
+    path: "/meu-historico",
+    element: (
+      <RequireAuth>
+        <ClientHistory />
+      </RequireAuth>
+    )
+  },
+  {
     path: "/dashboard",
     element: (
       <RequireAuth requireAdmin>
@@ -42,7 +51,7 @@ const routes: RouteObject[] = [
       { path: "novo-agendamento", element: <DashboardNewAppointment /> },
       { path: "clientes", element: <DashboardClients /> },
       { path: "relatorios", element: <DashboardReports /> },
-      { path: "integracoes", element: <DashboardIntegrations /> }
+      { path: "configuracoes", element: <DashboardSettings /> }
     ]
   },
   {

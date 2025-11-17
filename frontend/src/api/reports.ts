@@ -18,4 +18,25 @@ export async function fetchMonthlyRevenue(month: string) {
   return data;
 }
 
+export interface PendingPayment {
+  id: string;
+  date: string;
+  clientName: string;
+  clientPhone: string;
+  serviceName: string;
+  amount: number;
+  paymentId: string;
+}
+
+export interface PendingPaymentsResponse {
+  appointments: PendingPayment[];
+  total: number;
+  count: number;
+}
+
+export async function fetchPendingPayments() {
+  const { data } = await api.get<PendingPaymentsResponse>("/reports/pending");
+  return data;
+}
+
 

@@ -7,6 +7,7 @@ import { updatePaymentStatus } from "../../api/payments";
 import { useIsMobile } from "../../utils/useIsMobile";
 import { KanbanColumn } from "./KanbanColumn";
 import { DashboardStats } from "./DashboardStats";
+import { AppointmentDetailsModal } from "../../components/modals/AppointmentDetailsModal";
 
 const columns: { status: AppointmentStatus; title: string }[] = [
   { status: "AGENDADO", title: "Agendado" },
@@ -20,6 +21,8 @@ export function DashboardKanban() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const sensors = useSensors(
@@ -34,8 +37,19 @@ export function DashboardKanban() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listAppointments({ date: format(selectedDate, "yyyy-MM-dd") });
-      setAppointments(data);
+      // Usar start e end para garantir que pega apenas o dia selecionado
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      const data = await listAppointments({ 
+        start: startOfDay.toISOString(),
+        end: endOfDay.toISOString()
+      });
+      // Filtrar agendamentos cancelados
+      const filteredData = data.filter((apt) => apt.status !== "CANCELADO");
+      setAppointments(filteredData);
     } catch (error) {
       console.error(error);
       setError("Não foi possível carregar a agenda.");
@@ -67,11 +81,41 @@ export function DashboardKanban() {
   }, [fetchAppointments, selectedDate]);
 
   const handleAdvance = async (id: string, nextStatus: AppointmentStatus) => {
+    const appointment = appointments.find((a) => a.id === id);
+    if (!appointment) return;
+
+    // Verificar se está tentando voltar para trás quando já está em LAVANDO ou ENTREGUE
+    const statusOrder: AppointmentStatus[] = ["AGENDADO", "LAVANDO", "ENTREGUE"];
+    const currentIndex = statusOrder.indexOf(appointment.status);
+    const nextIndex = statusOrder.indexOf(nextStatus);
+
+    if (currentIndex > nextIndex) {
+      // Tentando voltar para trás
+      if (appointment.status === "LAVANDO" || appointment.status === "ENTREGUE") {
+        alert("Não é possível voltar o status após iniciar a lavagem.");
+        return;
+      }
+    }
+
+    // Confirmação antes de alterar status
+    const statusLabels: Record<AppointmentStatus, string> = {
+      AGENDADO: "Agendado",
+      LAVANDO: "Lavando",
+      ENTREGUE: "Entregue",
+      CANCELADO: "Cancelado"
+    };
+
+    const confirmMessage = `Deseja realmente alterar o status de "${statusLabels[appointment.status]}" para "${statusLabels[nextStatus]}"?`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
     try {
       const updated = await updateAppointmentStatus(id, nextStatus);
       setAppointments((prev) => prev.map((item) => (item.id === id ? updated : item)));
     } catch (error) {
       console.error(error);
+      alert("Erro ao atualizar status. Tente novamente.");
     }
   };
 
@@ -147,6 +191,32 @@ export function DashboardKanban() {
 
     if (!targetStatus || appointment.status === targetStatus) return;
 
+    // Verificar se está tentando voltar para trás
+    const statusOrder: AppointmentStatus[] = ["AGENDADO", "LAVANDO", "ENTREGUE"];
+    const currentIndex = statusOrder.indexOf(appointment.status);
+    const nextIndex = statusOrder.indexOf(targetStatus);
+
+    if (currentIndex > nextIndex) {
+      // Tentando voltar para trás
+      if (appointment.status === "LAVANDO" || appointment.status === "ENTREGUE") {
+        alert("Não é possível voltar o status após iniciar a lavagem.");
+        return;
+      }
+    }
+
+    // Confirmação antes de alterar status via drag
+    const statusLabels: Record<AppointmentStatus, string> = {
+      AGENDADO: "Agendado",
+      LAVANDO: "Lavando",
+      ENTREGUE: "Entregue",
+      CANCELADO: "Cancelado"
+    };
+
+    const confirmMessage = `Deseja realmente alterar o status de "${statusLabels[appointment.status]}" para "${statusLabels[targetStatus]}"?`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
     await handleAdvance(appointmentId, targetStatus);
   };
 
@@ -183,7 +253,7 @@ export function DashboardKanban() {
           {columns.map((column) => {
             const columnAppointments = appointments.filter((appt) => appt.status === column.status);
             return (
-              <KanbanColumn
+                <KanbanColumn
                 key={column.status}
                 status={column.status}
                 title={column.title}
@@ -191,6 +261,10 @@ export function DashboardKanban() {
                 getNextStatus={getNextStatus}
                 onAdvance={handleAdvance}
                 onMarkPaid={handleMarkPaid}
+                onCardClick={(appointment) => {
+                  setSelectedAppointment(appointment);
+                  setIsDetailsOpen(true);
+                }}
                 isMobile={isMobile}
                 colorClass={columnColors[column.status]}
               />
@@ -205,9 +279,16 @@ export function DashboardKanban() {
                   <h3 className="text-sm font-bold text-secondary-900 truncate">
                     {activeAppointment.client.name}
                   </h3>
-                  <p className="text-xs text-secondary-600 truncate">
-                    {activeAppointment.client.vehicle}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-secondary-600 truncate">
+                      {activeAppointment.client.vehicle}
+                    </p>
+                    {activeAppointment.client.plate && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gradient-to-r from-primary to-accent text-white shadow-sm flex-shrink-0">
+                        {activeAppointment.client.plate}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className="rounded-full bg-gradient-to-r from-primary to-accent px-2 py-1 text-xs font-bold text-white shadow-md flex-shrink-0">
                   {format(new Date(activeAppointment.date), "HH:mm")}
@@ -218,6 +299,19 @@ export function DashboardKanban() {
         </DragOverlay>
       </DndContext>
       </div>
+
+      {/* Modal de Detalhes */}
+      <AppointmentDetailsModal
+        isOpen={isDetailsOpen}
+        onClose={() => {
+          setIsDetailsOpen(false);
+          setSelectedAppointment(null);
+        }}
+        appointment={selectedAppointment}
+        onUpdate={() => {
+          fetchAppointments();
+        }}
+      />
     </div>
   );
 }

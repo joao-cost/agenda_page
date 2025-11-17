@@ -14,6 +14,7 @@ export interface Client {
   name: string;
   phone: string;
   vehicle: string;
+  plate?: string;
   notes?: string;
   createdAt: string;
 }
@@ -40,6 +41,7 @@ export interface Appointment {
   date: string;
   status: AppointmentStatus;
   notes?: string;
+  washerId?: string;
   client: Client;
   service: Service;
   payment?: Payment;

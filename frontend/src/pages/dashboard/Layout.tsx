@@ -21,7 +21,7 @@ const navItems = [
   { to: "/dashboard/novo-agendamento", label: "Novo agendamento", icon: PlusCircle },
   { to: "/dashboard/clientes", label: "Clientes", icon: Users },
   { to: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
-  { to: "/dashboard/integracoes", label: "Integrações", icon: Settings }
+  { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings }
 ];
 
 export function DashboardLayout() {

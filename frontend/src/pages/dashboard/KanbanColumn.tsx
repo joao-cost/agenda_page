@@ -12,6 +12,7 @@ interface KanbanColumnProps {
   getNextStatus: (status: AppointmentStatus) => AppointmentStatus | null;
   onAdvance: (id: string, status: AppointmentStatus) => void;
   onMarkPaid: (appointment: Appointment) => void;
+  onCardClick?: (appointment: Appointment) => void;
   isMobile: boolean;
   colorClass: string;
 }
@@ -23,6 +24,7 @@ export function KanbanColumn({
   getNextStatus,
   onAdvance,
   onMarkPaid,
+  onCardClick,
   isMobile,
   colorClass
 }: KanbanColumnProps) {
@@ -78,6 +80,7 @@ export function KanbanColumn({
                     nextStatus={nextStatus}
                     onAdvance={onAdvance}
                     onMarkPaid={onMarkPaid}
+                    onCardClick={onCardClick}
                     isMobile={isMobile}
                   />
                 </div>

@@ -21,7 +21,7 @@ export const authController = {
       return res.status(400).json({ message: parseResult.error.flatten() });
     }
 
-    const { name, phone, vehicle, email, password } = parseResult.data;
+    const { name, phone, vehicle, plate, email, password } = parseResult.data;
 
     const existingUser = await prisma.user.findUnique({ where: { login: email } });
     if (existingUser) {
@@ -34,7 +34,8 @@ export const authController = {
       data: {
         name,
         phone,
-        vehicle
+        vehicle,
+        plate: plate || null
       }
     });
 

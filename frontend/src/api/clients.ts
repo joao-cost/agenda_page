@@ -10,6 +10,7 @@ export async function createClient(payload: {
   name: string;
   phone: string;
   vehicle: string;
+  plate?: string;
   notes?: string;
 }) {
   const { data } = await api.post<Client>("/clients", payload);

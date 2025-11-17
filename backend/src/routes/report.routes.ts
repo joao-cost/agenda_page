@@ -8,6 +8,7 @@ reportRoutes.use(ensureAuthenticated({ adminOnly: true }));
 
 reportRoutes.get("/daily", reportController.daily);
 reportRoutes.get("/monthly", reportController.monthly);
+reportRoutes.get("/pending", reportController.pending);
 
 export { reportRoutes };
 

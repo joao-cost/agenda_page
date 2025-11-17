@@ -5,8 +5,9 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 import { updateAppointmentStatus } from "../../api/appointments";
+import { updatePaymentStatus } from "../../api/payments";
 import { useState } from "react";
-import { Edit, CheckCircle, XCircle } from "lucide-react";
+import { Edit, CheckCircle, XCircle, MessageCircle, DollarSign } from "lucide-react";
 
 interface AppointmentDetailsModalProps {
   isOpen: boolean;
@@ -29,6 +30,32 @@ export function AppointmentDetailsModal({
   if (!appointment) return null;
 
   const handleStatusChange = async (newStatus: AppointmentStatus) => {
+    // Verificar se está tentando voltar para trás quando já está em LAVANDO ou ENTREGUE
+    const statusOrder: AppointmentStatus[] = ["AGENDADO", "LAVANDO", "ENTREGUE"];
+    const currentIndex = statusOrder.indexOf(appointment.status);
+    const nextIndex = statusOrder.indexOf(newStatus);
+
+    if (currentIndex > nextIndex) {
+      // Tentando voltar para trás
+      if (appointment.status === "LAVANDO" || appointment.status === "ENTREGUE") {
+        alert("Não é possível voltar o status após iniciar a lavagem.");
+        return;
+      }
+    }
+
+    // Confirmação antes de alterar status
+    const statusLabels: Record<AppointmentStatus, string> = {
+      AGENDADO: "Agendado",
+      LAVANDO: "Lavando",
+      ENTREGUE: "Entregue",
+      CANCELADO: "Cancelado"
+    };
+
+    const confirmMessage = `Deseja realmente alterar o status de "${statusLabels[appointment.status]}" para "${statusLabels[newStatus]}"?`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -48,6 +75,26 @@ export function AppointmentDetailsModal({
   const handleCancel = async () => {
     if (!confirm("Tem certeza que deseja cancelar este agendamento?")) return;
     await handleStatusChange("CANCELADO" as AppointmentStatus);
+  };
+
+  const handleMarkPaid = async () => {
+    if (!appointment.payment) return;
+    if (!confirm("Deseja realmente marcar este pagamento como pago?")) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      await updatePaymentStatus(appointment.payment.id, "PAGO");
+      onUpdate?.();
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.message || "Erro ao atualizar status do pagamento.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusColor = (status: AppointmentStatus) => {
@@ -115,16 +162,46 @@ export function AppointmentDetailsModal({
             </div>
             <div>
               <p className="text-xs text-secondary-500">Telefone</p>
-              <a
-                href={`tel:${appointment.client.phone}`}
-                className="text-base font-semibold text-primary hover:underline"
-              >
-                {appointment.client.phone}
-              </a>
+              <div className="flex items-center gap-2 mt-1">
+                <a
+                  href={`tel:${appointment.client.phone}`}
+                  className="text-base font-semibold text-primary hover:underline"
+                >
+                  {appointment.client.phone}
+                </a>
+                <a
+                  href={`https://wa.me/${(() => {
+                    let phone = appointment.client.phone.replace(/[\s\(\)\-]/g, "").replace(/^\+/, "");
+                    if (phone.startsWith("0")) phone = phone.substring(1);
+                    if (!phone.startsWith("55") && (phone.length === 10 || phone.length === 11)) {
+                      phone = "55" + phone;
+                    }
+                    return phone;
+                  })()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2"
+                >
+                  <Button
+                    type="button"
+                    className="h-8 px-3 bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 shadow-md"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-1" />
+                    WhatsApp
+                  </Button>
+                </a>
+              </div>
             </div>
             <div>
               <p className="text-xs text-secondary-500">Veículo</p>
-              <p className="text-base font-semibold text-secondary-700">{appointment.client.vehicle}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-base font-semibold text-secondary-700">{appointment.client.vehicle}</p>
+                {appointment.client.plate && (
+                  <span className="px-2 py-1 text-xs font-bold rounded-lg bg-gradient-to-r from-primary to-accent text-white shadow-md">
+                    {appointment.client.plate}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -208,6 +285,16 @@ export function AppointmentDetailsModal({
                   })}
                 </span>
               </div>
+              {appointment.payment.status === "PENDENTE" && (
+                <Button
+                  onClick={handleMarkPaid}
+                  disabled={loading}
+                  className="mt-3 w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Marcar como Pago
+                </Button>
+              )}
             </div>
           </div>
         )}

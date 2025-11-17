@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { useDraggable } from "@dnd-kit/core";
+import { useEffect, useState } from "react";
 import type { Appointment, AppointmentStatus } from "../../types";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
@@ -11,6 +12,7 @@ interface KanbanCardProps {
   nextStatus: AppointmentStatus | null;
   onAdvance: (id: string, status: AppointmentStatus) => void;
   onMarkPaid: (appointment: Appointment) => void;
+  onCardClick?: (appointment: Appointment) => void;
   isDragging?: boolean;
   isMobile: boolean;
 }
@@ -20,9 +22,12 @@ export function KanbanCard({
   nextStatus,
   onAdvance,
   onMarkPaid,
+  onCardClick,
   isDragging = false,
   isMobile
 }: KanbanCardProps) {
+  const [hasDragged, setHasDragged] = useState(false);
+
   const {
     attributes,
     listeners,
@@ -35,10 +40,28 @@ export function KanbanCard({
     disabled: isMobile
   });
 
+  useEffect(() => {
+    if (cardIsDragging) {
+      setHasDragged(true);
+    } else {
+      // Reset após um pequeno delay para permitir click após drag
+      const timer = setTimeout(() => setHasDragged(false), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [cardIsDragging]);
+
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     transition: cardIsDragging ? undefined : transition,
     opacity: cardIsDragging ? 0 : 1
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Não abrir modal se estiver arrastando, já arrastou recentemente, clicar no botão ou no grip
+    if (cardIsDragging || hasDragged || (e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[data-grip]')) {
+      return;
+    }
+    onCardClick?.(appointment);
   };
 
   return (
@@ -47,15 +70,17 @@ export function KanbanCard({
       data-draggable-id={appointment.id}
       style={style}
       {...(!isMobile ? { ...attributes, ...listeners } : {})}
+      onClick={handleCardClick}
       className={cn(
         "group rounded-xl border-2 border-secondary-200 bg-white p-5 shadow-md hover:shadow-xl transition-all",
         !isMobile && !cardIsDragging && "cursor-grab",
         cardIsDragging && "cursor-grabbing ring-2 ring-primary ring-offset-2 z-50 rotate-2 shadow-2xl",
-        isDragging && "opacity-50"
+        isDragging && "opacity-50",
+        onCardClick && !cardIsDragging && "cursor-pointer"
       )}
     >
       {!isMobile && (
-        <div className="flex items-center justify-center mb-2 -mt-2 -mx-2 text-secondary-400 pointer-events-none">
+        <div data-grip className="flex items-center justify-center mb-2 -mt-2 -mx-2 text-secondary-400 pointer-events-none">
           <GripVertical className="h-5 w-5" />
         </div>
       )}
@@ -64,9 +89,16 @@ export function KanbanCard({
           <h3 className="text-base font-bold text-secondary-900">
             {appointment.client.name}
           </h3>
-          <p className="text-xs text-secondary-600 mt-0.5">
-            {appointment.client.vehicle}
-          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-xs text-secondary-600">
+              {appointment.client.vehicle}
+            </p>
+            {appointment.client.plate && (
+              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gradient-to-r from-primary to-accent text-white shadow-sm">
+                {appointment.client.plate}
+              </span>
+            )}
+          </div>
         </div>
         <span className="rounded-full bg-gradient-to-r from-primary to-accent px-3 py-1 text-xs font-bold text-white shadow-md">
           {format(new Date(appointment.date), "HH:mm")}

@@ -6,6 +6,41 @@ function toNumber(value: any) {
 }
 
 export const reportController = {
+  async pending(req: Request, res: Response) {
+    const pendingAppointments = await prisma.appointment.findMany({
+      where: {
+        status: "ENTREGUE",
+        payment: {
+          status: "PENDENTE"
+        }
+      },
+      include: {
+        client: true,
+        service: true,
+        payment: true
+      },
+      orderBy: { date: "desc" }
+    });
+
+    const totalPending = pendingAppointments.reduce((sum, apt) => {
+      return sum + Number(apt.payment?.amount || 0);
+    }, 0);
+
+    return res.json({
+      appointments: pendingAppointments.map((apt) => ({
+        id: apt.id,
+        date: apt.date.toISOString(),
+        clientName: apt.client.name,
+        clientPhone: apt.client.phone,
+        serviceName: apt.service.name,
+        amount: Number(apt.payment?.amount || 0),
+        paymentId: apt.payment?.id
+      })),
+      total: totalPending,
+      count: pendingAppointments.length
+    });
+  },
+
   async daily(req: Request, res: Response) {
     const { date } = req.query;
     if (typeof date !== "string") {
@@ -55,7 +90,8 @@ export const reportController = {
 
     const totalPaid = toNumber(paidSummary._sum.amount);
     const pending = toNumber(pendingSummary._sum.amount);
-    const total = totalPaid + pending;
+    // Total arrecadado é apenas o que foi pago
+    const total = totalPaid;
 
     return res.json({
       date,
@@ -117,7 +153,8 @@ export const reportController = {
 
     const totalPaid = toNumber(paidSummary._sum.amount);
     const pending = toNumber(pendingSummary._sum.amount);
-    const total = totalPaid + pending;
+    // Total arrecadado é apenas o que foi pago
+    const total = totalPaid;
 
     return res.json({
       date: month,

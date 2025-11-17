@@ -6,6 +6,7 @@ export async function createAppointment(payload: {
   clientId: string;
   date: string;
   notes?: string;
+  washerId?: string;
 }) {
   const { data } = await api.post<Appointment>("/appointments", payload);
   return data;
@@ -18,7 +19,17 @@ export interface ListAppointmentsParams {
 }
 
 export async function listAppointments(params?: ListAppointmentsParams) {
-  const { data } = await api.get<Appointment[]>("/appointments", { params });
+  // Adicionar timestamp para evitar cache (304 Not Modified)
+  const cacheBust = Date.now();
+  const { data } = await api.get<Appointment[]>("/appointments", { 
+    params: {
+      ...params,
+      _t: cacheBust
+    },
+    headers: {
+      'Cache-Control': 'no-cache'
+    }
+  });
   return data;
 }
 
@@ -31,6 +42,7 @@ export async function updateAppointment(id: string, payload: {
   serviceId?: string;
   date?: string;
   notes?: string;
+  washerId?: string;
 }) {
   const { data } = await api.patch<Appointment>(`/appointments/${id}`, payload);
   return data;
@@ -47,7 +59,7 @@ export interface AvailabilityResponse {
   availableSlots: string[];
 }
 
-export async function fetchAvailability(params: { serviceId: string; date: string }) {
+export async function fetchAvailability(params: { serviceId: string; date: string; washerId?: string }) {
   const { data } = await api.get<AvailabilityResponse>("/appointments/availability", { params });
   return data;
 }

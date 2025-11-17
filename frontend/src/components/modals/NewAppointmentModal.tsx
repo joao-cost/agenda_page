@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { listServices } from "../../api/services";
 import { listClients } from "../../api/clients";
 import { createAppointment, fetchAvailability, type AvailabilityResponse } from "../../api/appointments";
+import { fetchGeneralSettings, type GeneralSettings } from "../../api/settings";
 import type { Client, Service } from "../../types";
 import { Modal } from "../ui/Modal";
 import { Label } from "../ui/Label";
@@ -24,6 +25,7 @@ interface AppointmentForm {
   clientId: string;
   serviceId: string;
   notes?: string;
+  washerId?: string;
 }
 
 const DAYS_TO_DISPLAY = 7;
@@ -38,6 +40,8 @@ export function NewAppointmentModal({ isOpen, onClose, initialDate, onSuccess }:
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [settings, setSettings] = useState<GeneralSettings | null>(null);
+  const [selectedWasherId, setSelectedWasherId] = useState<string | null>(null);
 
   const {
     register,
@@ -48,6 +52,19 @@ export function NewAppointmentModal({ isOpen, onClose, initialDate, onSuccess }:
   } = useForm<AppointmentForm>();
 
   const selectedServiceId = watch("serviceId");
+  const isMultiWasherMode = settings?.multiWasher && settings?.washers && settings.washers.length > 0;
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const data = await fetchGeneralSettings();
+        setSettings(data);
+      } catch (err) {
+        console.error("Erro ao carregar configurações:", err);
+      }
+    }
+    loadSettings();
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -84,7 +101,8 @@ export function NewAppointmentModal({ isOpen, onClose, initialDate, onSuccess }:
       try {
         const data = await fetchAvailability({
           serviceId: selectedServiceId,
-          date: format(selectedDate, "yyyy-MM-dd")
+          date: format(selectedDate, "yyyy-MM-dd"),
+          washerId: isMultiWasherMode && selectedWasherId ? selectedWasherId : undefined
         });
         setAvailability(data);
 
@@ -101,7 +119,7 @@ export function NewAppointmentModal({ isOpen, onClose, initialDate, onSuccess }:
     }
 
     loadAvailability();
-  }, [selectedServiceId, selectedDate, isOpen]);
+  }, [selectedServiceId, selectedDate, isOpen, isMultiWasherMode, selectedWasherId]);
 
   const calendarDays = useMemo(
     () => Array.from({ length: DAYS_TO_DISPLAY }, (_, index) => addDays(startOfDay(new Date()), index)),
@@ -124,7 +142,8 @@ export function NewAppointmentModal({ isOpen, onClose, initialDate, onSuccess }:
         clientId: data.clientId,
         serviceId: data.serviceId,
         date: selectedSlot,
-        notes: data.notes
+        notes: data.notes,
+        washerId: isMultiWasherMode && selectedWasherId ? selectedWasherId : undefined
       });
       setFeedback("Agendamento criado com sucesso!");
       reset();
@@ -154,7 +173,7 @@ export function NewAppointmentModal({ isOpen, onClose, initialDate, onSuccess }:
               </option>
               {clients.map((client) => (
                 <option key={client.id} value={client.id}>
-                  {client.name} • {client.phone}
+                  {client.name} • {client.phone} • {client.vehicle}{client.plate ? ` • ${client.plate}` : ''}
                 </option>
               ))}
             </Select>
@@ -173,6 +192,27 @@ export function NewAppointmentModal({ isOpen, onClose, initialDate, onSuccess }:
             </Select>
           </div>
         </div>
+
+        {isMultiWasherMode && settings?.washers && settings.washers.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="washerId">Lavador *</Label>
+            <Select
+              id="washerId"
+              value={selectedWasherId || ""}
+              onChange={(e) => setSelectedWasherId(e.target.value || null)}
+              required={isMultiWasherMode}
+            >
+              <option value="" disabled>
+                Selecionar lavador
+              </option>
+              {settings.washers.map((washer) => (
+                <option key={washer.id} value={washer.id}>
+                  {washer.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-4">
           <div>

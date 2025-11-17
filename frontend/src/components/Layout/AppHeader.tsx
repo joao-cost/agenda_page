@@ -82,22 +82,6 @@ export function AppHeader() {
               <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-accent" />
             )}
           </Link>
-          {isAuthenticated && isAdmin && (
-            <Link
-              to="/dashboard"
-              className={cn(
-                "relative transition-colors hover:text-primary",
-                location.pathname.startsWith("/dashboard")
-                  ? "text-primary font-semibold"
-                  : "text-surface/80"
-              )}
-            >
-              Painel
-              {location.pathname.startsWith("/dashboard") && (
-                <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-accent" />
-              )}
-            </Link>
-          )}
         </nav>
 
         {/* Desktop Actions */}
@@ -128,10 +112,10 @@ export function AppHeader() {
               <Avatar initials={user?.name ?? user?.email} />
               <Button
                 variant="secondary"
-                onClick={() => navigate(isAdmin ? "/dashboard" : "/agendar")}
+                onClick={() => navigate(isAdmin ? "/dashboard" : "/meu-historico")}
                 className="border-primary/30 bg-primary/10 text-surface hover:bg-primary/20"
               >
-                {isAdmin ? "Acessar painel" : "Últimos serviços"}
+                {isAdmin ? "Acessar painel" : "Meu histórico"}
               </Button>
               <Button
                 variant="outline"
@@ -235,24 +219,24 @@ export function AppHeader() {
                 >
                   Agendar
                 </Link>
-                {isAuthenticated && isAdmin && (
-                  <Link
-                    to="/dashboard"
-                    onClick={handleLinkClick}
-                    className={cn(
-                      "rounded-xl px-4 py-3 text-base font-medium transition-all",
-                    location.pathname.startsWith("/dashboard")
-                      ? "bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30"
-                      : "text-surface/80 hover:bg-primary/20"
-                    )}
-                  >
-                    Painel
-                  </Link>
-                )}
               </nav>
 
               {/* Mobile Actions */}
               <div className="flex flex-col gap-3 border-t border-primary/10 pt-6">
+                {isAuthenticated && !isAdmin && (
+                  <Link
+                    to="/meu-historico"
+                    onClick={handleLinkClick}
+                    className={cn(
+                      "rounded-xl px-4 py-3 text-base font-medium transition-all text-center",
+                      location.pathname.startsWith("/meu-historico")
+                        ? "bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30"
+                        : "text-surface/80 hover:bg-primary/20"
+                    )}
+                  >
+                    Meu histórico
+                  </Link>
+                )}
                 {!isAuthenticated ? (
                   <>
                     <Button
@@ -280,12 +264,12 @@ export function AppHeader() {
                     <Button
                       variant="secondary"
                       onClick={() => {
-                        navigate(isAdmin ? "/dashboard" : "/agendar");
+                        navigate(isAdmin ? "/dashboard" : "/meu-historico");
                         handleLinkClick();
                       }}
                       className="w-full border-primary/30 bg-primary/10 text-surface hover:bg-primary/20"
                     >
-                      {isAdmin ? "Acessar painel" : "Últimos serviços"}
+                      {isAdmin ? "Acessar painel" : "Meu histórico"}
                     </Button>
                     <Button
                       variant="outline"

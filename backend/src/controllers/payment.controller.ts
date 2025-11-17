@@ -32,7 +32,7 @@ export const paymentController = {
       clientName: payment.appointment.client.name,
       phone: payment.appointment.client.phone,
       serviceName: payment.appointment.service.name,
-      dateTime: payment.appointment.date,
+      dateTime: payment.appointment.date.toISOString(),
       status: payment.status
     }).catch((error) => console.error("Erro ao enviar notificação de pagamento:", error));
 

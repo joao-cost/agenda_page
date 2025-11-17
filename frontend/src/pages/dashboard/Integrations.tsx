@@ -69,12 +69,12 @@ export function DashboardIntegrations() {
   const isConnected = Boolean(form.domain && form.token);
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-2">
+    <div className="h-full flex flex-col gap-6 overflow-hidden">
+      <header className="flex flex-col gap-2 flex-shrink-0">
         <Badge variant="secondary" className="bg-primary/10 text-primary w-fit">
           Integrações
         </Badge>
-        <h1 className="text-2xl font-semibold text-secondary-900">Conectar Evolution API</h1>
+        <h1 className="text-2xl font-bold text-secondary-900">Conectar Evolution API</h1>
         <p className="text-sm text-secondary-600 max-w-2xl">
           Informe o domínio e o token gerados no painel da Evolution API para habilitar as notificações
           via WhatsApp. Consulte a documentação oficial para criar sessões ou recuperar seus dados de acesso.
@@ -91,14 +91,15 @@ export function DashboardIntegrations() {
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-secondary-900">
-              Credenciais da Evolution API
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      <div className="flex-1 overflow-auto min-h-0">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr] h-full">
+          <Card className="bg-gradient-to-br from-white via-white to-primary/5 border-2 border-primary/20 shadow-xl flex flex-col overflow-hidden">
+            <CardHeader className="border-b border-primary/20 pb-4 flex-shrink-0">
+              <CardTitle className="text-xl font-bold text-secondary-900">
+                Credenciais da Evolution API
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto">
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <Label htmlFor="domain">Domínio da API</Label>
@@ -132,7 +133,11 @@ export function DashboardIntegrations() {
                   Utilize para reutilizar uma sessão existente ou deixe em branco para gerar via API.
                 </p>
               </div>
-              <Button type="submit" disabled={saving} className="w-full">
+              <Button 
+                type="submit" 
+                disabled={saving} 
+                className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-lg hover:shadow-xl"
+              >
                 {saving ? "Salvando..." : "Salvar configurações"}
               </Button>
               {feedback && (
@@ -149,11 +154,11 @@ export function DashboardIntegrations() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white">
-          <CardHeader>
-            <CardTitle className="text-lg text-secondary-900">Passo a passo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-secondary-600">
+          <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-2 border-blue-300/30 shadow-xl flex flex-col overflow-hidden">
+            <CardHeader className="border-b border-primary/20 pb-4 flex-shrink-0">
+              <CardTitle className="text-xl font-bold text-secondary-900">Passo a passo</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto space-y-4 text-sm text-secondary-600">
             <ol className="space-y-3 list-decimal pl-4">
               <li>
                 Acesse a documentação oficial da Evolution API e gere seu <strong>token</strong> e{" "}
@@ -177,7 +182,7 @@ export function DashboardIntegrations() {
                 Faça um teste criando um agendamento manual pelo painel.
               </li>
             </ol>
-            <div className="rounded-xl border border-secondary-100 bg-primary/5 p-4">
+            <div className="rounded-xl border-2 border-primary/20 bg-white/50 p-4 shadow-md">
               <p className="text-secondary-700">
                 Precisa de ajuda? Nosso time pode configurar tudo para você. Envie uma mensagem para
                 <span className="font-medium text-primary"> suporte@detailprime.com</span>.
@@ -185,6 +190,7 @@ export function DashboardIntegrations() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
       {loading && <p className="text-sm text-secondary-500">Carregando configurações...</p>}
     </div>

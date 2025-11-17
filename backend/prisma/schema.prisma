@@ -41,6 +41,7 @@ model Client {
   name           String
   phone          String
   vehicle        String
+  plate          String?
   notes          String?
   approved       Boolean        @default(false)
   appointments   Appointment[]
@@ -65,6 +66,7 @@ model Appointment {
   date          DateTime
   status        AppointmentStatus @default(AGENDADO)
   notes         String?
+  washerId      String?           // ID do lavador (quando multi-lavador ativo)
 
   clientId      String
   client        Client           @relation(fields: [clientId], references: [id])
@@ -94,5 +96,19 @@ model IntegrationSetting {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model GeneralSettings {
+  id                    String   @id @default(cuid())
+  multiWasher           Boolean  @default(false)
+  workStartHour         Int      @default(8)
+  workEndHour           Int      @default(18)
+  workDays              String   @default("1,2,3,4,5,6") // 0=domingo, 1=segunda, etc
+  closedDates           String?  // JSON array de datas fechadas
+  maxConcurrentBookings Int      @default(1) // Quantos agendamentos simultâneos (multi-lavador)
+  washers               String?  // JSON array de lavadores [{id, name}]
+  adminPhone            String?  // Telefone do administrador para notificações
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 

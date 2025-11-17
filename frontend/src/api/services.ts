@@ -6,4 +6,23 @@ export async function listServices() {
   return data;
 }
 
+export async function createService(payload: {
+  name: string;
+  description?: string;
+  price: number;
+  durationMin: number;
+}) {
+  const { data } = await api.post<Service>("/services", payload);
+  return data;
+}
+
+export async function updateService(id: string, payload: Partial<Service>) {
+  const { data } = await api.put<Service>(`/services/${id}`, payload);
+  return data;
+}
+
+export async function deleteService(id: string) {
+  await api.delete(`/services/${id}`);
+}
+
 

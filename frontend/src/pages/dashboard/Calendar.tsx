@@ -1,19 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
+  addDays,
   addMonths,
   eachDayOfInterval,
+  endOfDay,
   endOfMonth,
   endOfWeek,
   format,
   isSameDay,
   isSameMonth,
   parseISO,
+  startOfDay,
   startOfMonth,
   startOfWeek,
+  subDays,
   subMonths
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { listAppointments, type Appointment } from "../../api/appointments";
+import { fetchGeneralSettings, type GeneralSettings, type Washer } from "../../api/settings";
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
@@ -25,7 +30,9 @@ const WORK_START_HOUR = 8;
 const WORK_END_HOUR = 18;
 
 function groupAppointmentsByDay(appointments: Appointment[]) {
-  return appointments.reduce<Record<string, Appointment[]>>((acc, appointment) => {
+  // Filtrar agendamentos cancelados antes de agrupar
+  const activeAppointments = appointments.filter((apt) => apt.status !== "CANCELADO");
+  return activeAppointments.reduce<Record<string, Appointment[]>>((acc, appointment) => {
     const dayKey = format(new Date(appointment.date), "yyyy-MM-dd");
     acc[dayKey] = acc[dayKey] ? [...acc[dayKey], appointment] : [appointment];
     return acc;
@@ -42,50 +49,112 @@ export function DashboardCalendar() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [settings, setSettings] = useState<GeneralSettings | null>(null);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const data = await fetchGeneralSettings();
+        setSettings(data);
+      } catch (err) {
+        console.error("Erro ao carregar configurações:", err);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const isMultiWasherMode = settings?.multiWasher && settings?.washers && settings.washers.length > 0;
 
   const visibleRange = useMemo(() => {
-    const start = startOfWeek(anchorDate, { weekStartsOn: 1 });
-    const end = endOfWeek(anchorDate, { weekStartsOn: 1 });
-    return { start, end };
-  }, [anchorDate]);
+    if (isMultiWasherMode) {
+      // No modo multi-lavador, mostra apenas o dia selecionado
+      const start = startOfDay(anchorDate);
+      const end = startOfDay(anchorDate);
+      return { start, end };
+    } else {
+      // Modo normal: semana
+      const start = startOfWeek(anchorDate, { weekStartsOn: 1 });
+      const end = endOfWeek(anchorDate, { weekStartsOn: 1 });
+      return { start, end };
+    }
+  }, [anchorDate, isMultiWasherMode]);
 
-  async function loadAppointments() {
+  // Serializar anchorDate para garantir detecção de mudanças
+  const anchorDateString = format(anchorDate, "yyyy-MM-dd");
+
+  const loadAppointments = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      // Calcular o range dinamicamente baseado no anchorDate atual
+      let start: Date;
+      let end: Date;
+      
+      if (isMultiWasherMode) {
+        start = startOfDay(anchorDate);
+        end = endOfDay(anchorDate); // Fim do dia, não início!
+      } else {
+        start = startOfWeek(anchorDate, { weekStartsOn: 1 });
+        end = endOfWeek(anchorDate, { weekStartsOn: 1 });
+      }
+      
       const data = await listAppointments({
-        start: visibleRange.start.toISOString(),
-        end: visibleRange.end.toISOString()
+        start: start.toISOString(),
+        end: end.toISOString()
       });
+      // Filtrar agendamentos cancelados
+      const filteredData = data.filter((apt) => apt.status !== "CANCELADO");
       setAppointments(
-        data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        filteredData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       );
     } catch (err) {
-      console.error(err);
+      console.error("Erro ao carregar agendamentos:", err);
       setError("Não foi possível carregar os agendamentos.");
     } finally {
       setLoading(false);
     }
-  }
+  }, [anchorDateString, isMultiWasherMode, anchorDate]);
 
   useEffect(() => {
     loadAppointments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleRange.start, visibleRange.end]);
+  }, [loadAppointments]);
 
   const daysOfWeek = useMemo(
     () =>
-      eachDayOfInterval({
-        start: visibleRange.start,
-        end: visibleRange.end
-      }),
-    [visibleRange]
+      isMultiWasherMode
+        ? [anchorDate] // No modo multi-lavador, apenas o dia selecionado
+        : eachDayOfInterval({
+            start: visibleRange.start,
+            end: visibleRange.end
+          }),
+    [visibleRange, anchorDate, isMultiWasherMode]
   );
 
   const appointmentsByDay = useMemo(
     () => groupAppointmentsByDay(appointments),
     [appointments]
   );
+
+  const appointmentsByWasher = useMemo(() => {
+    if (!isMultiWasherMode || !settings?.washers) return {};
+    const dayKey = format(anchorDate, "yyyy-MM-dd");
+    const dayAppointments = appointmentsByDay[dayKey] || [];
+    
+    const result: Record<string, Appointment[]> = {};
+    settings.washers.forEach((washer) => {
+      result[washer.id] = dayAppointments.filter((apt) => apt.washerId === washer.id);
+    });
+    
+    // Agendamentos sem washerId atribuído: distribuir no primeiro lavador ou criar uma categoria "Sem lavador"
+    const unassignedAppointments = dayAppointments.filter((apt) => !apt.washerId);
+    if (unassignedAppointments.length > 0 && settings.washers.length > 0) {
+      // Atribuir ao primeiro lavador como fallback
+      const firstWasherId = settings.washers[0].id;
+      result[firstWasherId] = [...(result[firstWasherId] || []), ...unassignedAppointments];
+    }
+    
+    return result;
+  }, [appointmentsByDay, anchorDate, isMultiWasherMode, settings?.washers]);
 
   const hours = useMemo(() => {
     const list: number[] = [];
@@ -191,37 +260,71 @@ export function DashboardCalendar() {
       <Card className="bg-gradient-to-br from-white via-white to-primary/5 border-2 border-primary/20 shadow-xl flex-1 flex flex-col min-w-0">
         <CardHeader className="flex flex-col gap-3 border-b border-primary/20 pb-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <CardTitle className="text-xl font-bold text-secondary-900">Semana da agenda</CardTitle>
+            <CardTitle className="text-xl font-bold text-secondary-900">
+              {isMultiWasherMode ? "Agenda Diária" : "Semana da agenda"}
+            </CardTitle>
             <p className="text-sm text-secondary-600 font-medium">
-              {format(visibleRange.start, "dd MMM", { locale: ptBR })} –{" "}
-              {format(visibleRange.end, "dd MMM yyyy", { locale: ptBR })}
+              {isMultiWasherMode
+                ? format(anchorDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                : `${format(visibleRange.start, "dd MMM", { locale: ptBR })} – ${format(visibleRange.end, "dd MMM yyyy", { locale: ptBR })}`}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              type="button"
-              variant="secondary"
-              className="border-primary/30 hover:bg-primary/10"
-              onClick={() => {
-                const newDate = new Date(anchorDate);
-                newDate.setDate(newDate.getDate() - 7);
-                setAnchorDate(newDate);
-              }}
-            >
-              Semana anterior
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="border-primary/30 hover:bg-primary/10"
-              onClick={() => {
-                const newDate = new Date(anchorDate);
-                newDate.setDate(newDate.getDate() + 7);
-                setAnchorDate(newDate);
-              }}
-            >
-              Próxima semana
-            </Button>
+            {isMultiWasherMode ? (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="border-primary/30 hover:bg-primary/10"
+                  onClick={() => {
+                    const newDate = new Date(anchorDate);
+                    newDate.setDate(newDate.getDate() - 1);
+                    setAnchorDate(newDate);
+                  }}
+                >
+                  Dia anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="border-primary/30 hover:bg-primary/10"
+                  onClick={() => {
+                    const newDate = new Date(anchorDate);
+                    newDate.setDate(newDate.getDate() + 1);
+                    setAnchorDate(newDate);
+                  }}
+                >
+                  Próximo dia
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="border-primary/30 hover:bg-primary/10"
+                  onClick={() => {
+                    const newDate = new Date(anchorDate);
+                    newDate.setDate(newDate.getDate() - 7);
+                    setAnchorDate(newDate);
+                  }}
+                >
+                  Semana anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="border-primary/30 hover:bg-primary/10"
+                  onClick={() => {
+                    const newDate = new Date(anchorDate);
+                    newDate.setDate(newDate.getDate() + 7);
+                    setAnchorDate(newDate);
+                  }}
+                >
+                  Próxima semana
+                </Button>
+              </>
+            )}
             <Button 
               type="button" 
               className="bg-gradient-to-r from-primary to-accent text-white shadow-lg hover:shadow-xl"
@@ -242,110 +345,255 @@ export function DashboardCalendar() {
             </div>
           ) : (
             <div className="min-w-[720px]">
-              <div className="grid grid-cols-[80px_repeat(7,minmax(0,1fr))] gap-0 border-b-2 border-primary/20 sticky top-0 bg-white z-10">
-                <div className="bg-gradient-to-br from-primary/10 to-primary/5 border-r-2 border-primary/20"></div>
-                {daysOfWeek.map((day) => {
-                  const isToday = isSameDay(day, new Date());
-                  const isSelected = isSameDay(day, anchorDate);
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      className={`border-r-2 border-primary/20 px-3 py-3 text-center ${
-                        isToday || isSelected
-                          ? "bg-gradient-to-br from-primary/20 to-primary/10"
-                          : "bg-gradient-to-br from-primary/10 to-primary/5"
-                      }`}
-                    >
-                      <p className="text-xs uppercase tracking-wide font-bold text-secondary-600">
-                        {format(day, "EEE", { locale: ptBR })}
-                      </p>
-                      <p className={`text-lg font-bold ${
-                        isToday || isSelected ? "text-primary" : "text-secondary-900"
-                      }`}>
-                        {format(day, "dd")}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="grid grid-cols-[80px_repeat(7,minmax(0,1fr))]">
-                <div className="flex flex-col border-r-2 border-primary/20">
-                  {hours.map((hour) => (
-                    <div key={hour} className="h-20 border-b border-primary/10 px-3 py-2 bg-gradient-to-br from-primary/5 to-transparent">
-                      <span className="text-xs font-bold text-secondary-600">
-                        {String(hour).padStart(2, "0")}:00
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {daysOfWeek.map((day) => {
-                  const dayKey = format(day, "yyyy-MM-dd");
-                  const dayAppointments = appointmentsByDay[dayKey] ?? [];
-                  const isToday = isSameDay(day, new Date());
-                  const isSelected = isSameDay(day, anchorDate);
-
-                  return (
-                    <div 
-                      key={day.toISOString()} 
-                      className={`relative border-r-2 border-primary/20 ${
-                        isToday || isSelected ? "bg-primary/5" : ""
-                      }`}
-                    >
-                      {hours.map((hour) => (
-                        <div
-                          key={hour}
-                          className="h-20 border-b border-primary/10"
-                        />
-                      ))}
-
-                      <div className="absolute inset-0">
-                        {dayAppointments.map((appointment) => {
-                          const startDate = new Date(appointment.date);
-                          const endDate = new Date(startDate);
-                          endDate.setMinutes(
-                            endDate.getMinutes() + appointment.service.durationMin
-                          );
-
-                          const startMinutes =
-                            (startDate.getHours() - WORK_START_HOUR) * 60 + startDate.getMinutes();
-                          const duration = appointment.service.durationMin;
-
-                          const top = (startMinutes / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
-                          const height =
-                            (duration / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
-
-                          return (
-                            <div
-                              key={appointment.id}
-                              onClick={() => {
-                                setSelectedAppointment(appointment);
-                                setIsDetailsOpen(true);
-                              }}
-                              className="absolute left-2 right-2 rounded-xl border-2 border-primary/40 bg-gradient-to-br from-primary/20 to-primary/10 p-3 text-sm shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]"
-                              style={{
-                                top: `${top}%`,
-                                height: `${Math.max(height, 12)}%`
-                              }}
-                            >
-                              <p className="font-bold text-secondary-900 truncate">
-                                {appointment.client.name}
-                              </p>
-                              <p className="text-xs text-secondary-600 font-medium">
-                                {format(startDate, "HH:mm")} - {format(endDate, "HH:mm")}
-                              </p>
-                              <Badge className="mt-2 inline-block bg-gradient-to-r from-primary to-accent text-white text-xs font-bold shadow-md">
-                                {appointment.service.name}
-                              </Badge>
-                            </div>
-                          );
-                        })}
+              {isMultiWasherMode && settings?.washers ? (
+                <>
+                  <div 
+                    className="grid gap-0 border-b-2 border-primary/20 sticky top-0 bg-white z-10"
+                    style={{
+                      gridTemplateColumns: `80px repeat(${settings.washers.length}, minmax(0, 1fr))`
+                    }}
+                  >
+                    <div className="bg-gradient-to-br from-primary/10 to-primary/5 border-r-2 border-primary/20"></div>
+                    {settings.washers.map((washer) => (
+                      <div
+                        key={washer.id}
+                        className="border-r-2 border-primary/20 px-3 py-3 text-center bg-gradient-to-br from-primary/20 to-primary/10 last:border-r-0"
+                      >
+                        <p className="text-xs uppercase tracking-wide font-bold text-secondary-600">
+                          Lavador
+                        </p>
+                        <p className="text-lg font-bold text-primary">
+                          {washer.name}
+                        </p>
                       </div>
+                    ))}
+                  </div>
+
+                  <div 
+                    className="grid gap-0"
+                    style={{
+                      gridTemplateColumns: `80px repeat(${settings.washers.length}, minmax(0, 1fr))`
+                    }}
+                  >
+                    <div className="flex flex-col border-r-2 border-primary/20">
+                      {hours.map((hour) => (
+                        <div key={hour} className="h-20 border-b border-primary/10 px-3 py-2 bg-gradient-to-br from-primary/5 to-transparent">
+                          <span className="text-xs font-bold text-secondary-600">
+                            {String(hour).padStart(2, "0")}:00
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  );
-                })}
-              </div>
+
+                    {settings.washers.map((washer) => {
+                      const washerAppointments = appointmentsByWasher[washer.id] || [];
+                      return (
+                        <div 
+                          key={washer.id} 
+                          className="relative border-r-2 border-primary/20 bg-primary/5 last:border-r-0"
+                        >
+                          {hours.map((hour) => (
+                            <div
+                              key={hour}
+                              className="h-20 border-b border-primary/10"
+                            />
+                          ))}
+
+                          <div className="absolute inset-0">
+                            {/* Linha do horário atual */}
+                            {isSameDay(anchorDate, new Date()) && (() => {
+                              const now = new Date();
+                              const currentMinutes = (now.getHours() - WORK_START_HOUR) * 60 + now.getMinutes();
+                              const currentTop = (currentMinutes / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
+                              
+                              if (currentTop >= 0 && currentTop <= 100) {
+                                return (
+                                  <div
+                                    className="absolute left-0 right-0 z-20 pointer-events-none"
+                                    style={{ top: `${currentTop}%` }}
+                                  >
+                                    <div className="h-0.5 bg-red-500 shadow-lg shadow-red-500/50" />
+                                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full border-2 border-white shadow-md" />
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            
+                            {washerAppointments.map((appointment) => {
+                              const startDate = new Date(appointment.date);
+                              const endDate = new Date(startDate);
+                              endDate.setMinutes(
+                                endDate.getMinutes() + appointment.service.durationMin
+                              );
+
+                              const startMinutes =
+                                (startDate.getHours() - WORK_START_HOUR) * 60 + startDate.getMinutes();
+                              const duration = appointment.service.durationMin;
+
+                              const top = (startMinutes / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
+                              const height =
+                                (duration / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
+
+                              return (
+                                <div
+                                  key={appointment.id}
+                                  onClick={() => {
+                                    setSelectedAppointment(appointment);
+                                    setIsDetailsOpen(true);
+                                  }}
+                                  className="absolute left-2 right-2 rounded-xl border-2 border-primary/40 bg-gradient-to-br from-primary/20 to-primary/10 p-3 text-sm shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02] z-10"
+                                  style={{
+                                    top: `${top}%`,
+                                    height: `${Math.max(height, 12)}%`
+                                  }}
+                                >
+                                  <p className="font-bold text-secondary-900 truncate">
+                                    {appointment.client.name}
+                                  </p>
+                                  <p className="text-xs text-secondary-600 font-medium">
+                                    {format(startDate, "HH:mm")} - {format(endDate, "HH:mm")}
+                                  </p>
+                                  <Badge className="mt-2 inline-block bg-gradient-to-r from-primary to-accent text-white text-xs font-bold shadow-md">
+                                    {appointment.service.name}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-[80px_repeat(7,minmax(0,1fr))] gap-0 border-b-2 border-primary/20 sticky top-0 bg-white z-10">
+                    <div className="bg-gradient-to-br from-primary/10 to-primary/5 border-r-2 border-primary/20"></div>
+                    {daysOfWeek.map((day) => {
+                      const isToday = isSameDay(day, new Date());
+                      const isSelected = isSameDay(day, anchorDate);
+                      return (
+                        <div
+                          key={day.toISOString()}
+                          className={`border-r-2 border-primary/20 px-3 py-3 text-center ${
+                            isToday || isSelected
+                              ? "bg-gradient-to-br from-primary/20 to-primary/10"
+                              : "bg-gradient-to-br from-primary/10 to-primary/5"
+                          }`}
+                        >
+                          <p className="text-xs uppercase tracking-wide font-bold text-secondary-600">
+                            {format(day, "EEE", { locale: ptBR })}
+                          </p>
+                          <p className={`text-lg font-bold ${
+                            isToday || isSelected ? "text-primary" : "text-secondary-900"
+                          }`}>
+                            {format(day, "dd")}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-[80px_repeat(7,minmax(0,1fr))]">
+                    <div className="flex flex-col border-r-2 border-primary/20">
+                      {hours.map((hour) => (
+                        <div key={hour} className="h-20 border-b border-primary/10 px-3 py-2 bg-gradient-to-br from-primary/5 to-transparent">
+                          <span className="text-xs font-bold text-secondary-600">
+                            {String(hour).padStart(2, "0")}:00
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {daysOfWeek.map((day) => {
+                      const dayKey = format(day, "yyyy-MM-dd");
+                      const dayAppointments = appointmentsByDay[dayKey] ?? [];
+                      const isToday = isSameDay(day, new Date());
+                      const isSelected = isSameDay(day, anchorDate);
+
+                      return (
+                        <div 
+                          key={day.toISOString()} 
+                          className={`relative border-r-2 border-primary/20 ${
+                            isToday || isSelected ? "bg-primary/5" : ""
+                          }`}
+                        >
+                          {hours.map((hour) => (
+                            <div
+                              key={hour}
+                              className="h-20 border-b border-primary/10"
+                            />
+                          ))}
+
+                          <div className="absolute inset-0">
+                            {/* Linha do horário atual */}
+                            {isToday && (() => {
+                              const now = new Date();
+                              const currentMinutes = (now.getHours() - WORK_START_HOUR) * 60 + now.getMinutes();
+                              const currentTop = (currentMinutes / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
+                              
+                              if (currentTop >= 0 && currentTop <= 100) {
+                                return (
+                                  <div
+                                    className="absolute left-0 right-0 z-20 pointer-events-none"
+                                    style={{ top: `${currentTop}%` }}
+                                  >
+                                    <div className="h-0.5 bg-red-500 shadow-lg shadow-red-500/50" />
+                                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full border-2 border-white shadow-md" />
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            
+                            {dayAppointments.map((appointment) => {
+                              const startDate = new Date(appointment.date);
+                              const endDate = new Date(startDate);
+                              endDate.setMinutes(
+                                endDate.getMinutes() + appointment.service.durationMin
+                              );
+
+                              const startMinutes =
+                                (startDate.getHours() - WORK_START_HOUR) * 60 + startDate.getMinutes();
+                              const duration = appointment.service.durationMin;
+
+                              const top = (startMinutes / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
+                              const height =
+                                (duration / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
+
+                              return (
+                                <div
+                                  key={appointment.id}
+                                  onClick={() => {
+                                    setSelectedAppointment(appointment);
+                                    setIsDetailsOpen(true);
+                                  }}
+                                  className="absolute left-2 right-2 rounded-xl border-2 border-primary/40 bg-gradient-to-br from-primary/20 to-primary/10 p-3 text-sm shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]"
+                                  style={{
+                                    top: `${top}%`,
+                                    height: `${Math.max(height, 12)}%`
+                                  }}
+                                >
+                                  <p className="font-bold text-secondary-900 truncate">
+                                    {appointment.client.name}
+                                  </p>
+                                  <p className="text-xs text-secondary-600 font-medium">
+                                    {format(startDate, "HH:mm")} - {format(endDate, "HH:mm")}
+                                  </p>
+                                  <Badge className="mt-2 inline-block bg-gradient-to-r from-primary to-accent text-white text-xs font-bold shadow-md">
+                                    {appointment.service.name}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </CardContent>
@@ -391,24 +639,6 @@ export function DashboardCalendar() {
     </div>
   );
 
-  async function loadAppointments() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listAppointments({
-        start: visibleRange.start.toISOString(),
-        end: visibleRange.end.toISOString()
-      });
-      setAppointments(
-        data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      );
-    } catch (err) {
-      console.error(err);
-      setError("Não foi possível carregar os agendamentos.");
-    } finally {
-      setLoading(false);
-    }
-  }
 }
 
 
