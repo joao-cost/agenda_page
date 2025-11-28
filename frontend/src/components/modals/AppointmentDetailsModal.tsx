@@ -8,6 +8,8 @@ import { updateAppointmentStatus } from "../../api/appointments";
 import { updatePaymentStatus } from "../../api/payments";
 import { useState } from "react";
 import { Edit, CheckCircle, XCircle, MessageCircle, DollarSign } from "lucide-react";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { AlertDialog } from "../ui/AlertDialog";
 
 interface AppointmentDetailsModalProps {
   isOpen: boolean;
@@ -26,6 +28,19 @@ export function AppointmentDetailsModal({
 }: AppointmentDetailsModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: "warning" | "danger" | "info" | "success";
+  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: "error" | "success" | "info" | "warning";
+  }>({ isOpen: false, title: "", message: "" });
 
   if (!appointment) return null;
 
@@ -38,7 +53,12 @@ export function AppointmentDetailsModal({
     if (currentIndex > nextIndex) {
       // Tentando voltar para trás
       if (appointment.status === "LAVANDO" || appointment.status === "ENTREGUE") {
-        alert("Não é possível voltar o status após iniciar a lavagem.");
+        setAlertDialog({
+          isOpen: true,
+          title: "Ação não permitida",
+          message: "Não é possível voltar o status após iniciar a lavagem.",
+          type: "warning"
+        });
         return;
       }
     }
@@ -52,49 +72,71 @@ export function AppointmentDetailsModal({
     };
 
     const confirmMessage = `Deseja realmente alterar o status de "${statusLabels[appointment.status]}" para "${statusLabels[newStatus]}"?`;
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      await updateAppointmentStatus(appointment.id, newStatus);
-      onUpdate?.();
-      setTimeout(() => {
-        onClose();
-      }, 500);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.message || "Erro ao atualizar status.");
-    } finally {
-      setLoading(false);
-    }
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: "Confirmar alteração de status",
+      message: confirmMessage,
+      type: "warning",
+      onConfirm: async () => {
+        setLoading(true);
+        setError(null);
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        try {
+          await updateAppointmentStatus(appointment.id, newStatus);
+          onUpdate?.();
+          setTimeout(() => {
+            onClose();
+          }, 500);
+        } catch (err: any) {
+          console.error(err);
+          setError(err.response?.data?.message || "Erro ao atualizar status.");
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   const handleCancel = async () => {
-    if (!confirm("Tem certeza que deseja cancelar este agendamento?")) return;
-    await handleStatusChange("CANCELADO" as AppointmentStatus);
+    setConfirmDialog({
+      isOpen: true,
+      title: "Cancelar Agendamento",
+      message: "Tem certeza que deseja cancelar este agendamento?",
+      type: "danger",
+      onConfirm: () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        handleStatusChange("CANCELADO" as AppointmentStatus);
+      }
+    });
   };
 
   const handleMarkPaid = async () => {
     if (!appointment.payment) return;
-    if (!confirm("Deseja realmente marcar este pagamento como pago?")) return;
     
-    setLoading(true);
-    setError(null);
-    try {
-      await updatePaymentStatus(appointment.payment.id, "PAGO");
-      onUpdate?.();
-      setTimeout(() => {
-        onClose();
-      }, 500);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.message || "Erro ao atualizar status do pagamento.");
-    } finally {
-      setLoading(false);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Marcar como Pago",
+      message: "Deseja realmente marcar este pagamento como pago?",
+      type: "success",
+      onConfirm: async () => {
+        setLoading(true);
+        setError(null);
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        try {
+          await updatePaymentStatus(appointment.payment!.id, "PAGO");
+          onUpdate?.();
+          setTimeout(() => {
+            onClose();
+          }, 500);
+        } catch (err: any) {
+          console.error(err);
+          setError(err.response?.data?.message || "Erro ao atualizar status do pagamento.");
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   const getStatusColor = (status: AppointmentStatus) => {
@@ -360,6 +402,24 @@ export function AppointmentDetailsModal({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+        loading={loading}
+      />
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        type={alertDialog.type}
+      />
     </Modal>
   );
 }

@@ -47,8 +47,8 @@ export function AuthPage() {
   const {
     register: registerRegisterForm,
     handleSubmit: handleRegisterSubmit,
-    formState: { isSubmitting: isRegisterSubmitting }
-  } = useForm<RegisterForm>();
+    formState: { errors: registerErrors, isSubmitting: isRegisterSubmitting }
+  } = useForm<RegisterForm>({ mode: "onChange" });
 
   const from = (location.state as { from?: Location })?.from?.pathname || "/";
 
@@ -204,9 +204,33 @@ export function AuthPage() {
                       <Input
                         id="name"
                         placeholder="Seu nome"
-                        {...registerRegisterForm("name", { required: true })}
-                        className="h-12 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                        {...registerRegisterForm("name", {
+                          required: "O nome é obrigatório",
+                          minLength: {
+                            value: 3,
+                            message: "O nome deve ter pelo menos 3 caracteres"
+                          },
+                          maxLength: {
+                            value: 100,
+                            message: "O nome deve ter no máximo 100 caracteres"
+                          },
+                          pattern: {
+                            value: /^[a-zA-ZÀ-ÿ\s]+$/,
+                            message: "O nome pode conter apenas letras e espaços"
+                          }
+                        })}
+                        className={`h-12 border-2 rounded-xl ${
+                          registerErrors.name
+                            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                            : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        }`}
                       />
+                      {registerErrors.name && (
+                        <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{registerErrors.name.message}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone" className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
@@ -215,10 +239,35 @@ export function AuthPage() {
                       </Label>
                       <Input
                         id="phone"
+                        type="tel"
                         placeholder="(11) 99999-9999"
-                        {...registerRegisterForm("phone", { required: true })}
-                        className="h-12 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                        {...registerRegisterForm("phone", {
+                          required: "O telefone é obrigatório",
+                          pattern: {
+                            value: /^[\d\s\(\)\-]+$/,
+                            message: "Formato de telefone inválido"
+                          },
+                          minLength: {
+                            value: 10,
+                            message: "O telefone deve ter pelo menos 10 dígitos"
+                          },
+                          maxLength: {
+                            value: 15,
+                            message: "O telefone deve ter no máximo 15 caracteres"
+                          }
+                        })}
+                        className={`h-12 border-2 rounded-xl ${
+                          registerErrors.phone
+                            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                            : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        }`}
                       />
+                      {registerErrors.phone && (
+                        <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{registerErrors.phone.message}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -230,9 +279,29 @@ export function AuthPage() {
                       <Input
                         id="vehicle"
                         placeholder="Ex: Corolla Preto 2022"
-                        {...registerRegisterForm("vehicle", { required: true })}
-                        className="h-12 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                        {...registerRegisterForm("vehicle", {
+                          required: "O veículo é obrigatório",
+                          minLength: {
+                            value: 3,
+                            message: "O veículo deve ter pelo menos 3 caracteres"
+                          },
+                          maxLength: {
+                            value: 100,
+                            message: "O veículo deve ter no máximo 100 caracteres"
+                          }
+                        })}
+                        className={`h-12 border-2 rounded-xl ${
+                          registerErrors.vehicle
+                            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                            : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        }`}
                       />
+                      {registerErrors.vehicle && (
+                        <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{registerErrors.vehicle.message}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="plate" className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
@@ -247,10 +316,32 @@ export function AuthPage() {
                           setValueAs: (value: string) => {
                             if (!value) return value;
                             return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7);
+                          },
+                          pattern: {
+                            value: /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$|^[A-Z]{3}[0-9]{4}$/,
+                            message: "Formato de placa inválido. Use ABC1234 ou ABC1D23"
+                          },
+                          validate: (value) => {
+                            if (!value) return true; // Opcional
+                            const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                            if (cleaned.length < 7) {
+                              return "A placa deve ter 7 caracteres";
+                            }
+                            return true;
                           }
                         })}
-                        className="h-12 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                        className={`h-12 border-2 rounded-xl ${
+                          registerErrors.plate
+                            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                            : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        }`}
                       />
+                      {registerErrors.plate && (
+                        <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{registerErrors.plate.message}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -262,9 +353,29 @@ export function AuthPage() {
                       id="email"
                       type="email"
                       placeholder="seuemail@exemplo.com"
-                      {...registerRegisterForm("email", { required: true })}
-                      className="h-12 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                      {...registerRegisterForm("email", {
+                        required: "O e-mail é obrigatório",
+                        pattern: {
+                          value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                          message: "Formato de e-mail inválido"
+                        },
+                        maxLength: {
+                          value: 255,
+                          message: "O e-mail deve ter no máximo 255 caracteres"
+                        }
+                      })}
+                      className={`h-12 border-2 rounded-xl ${
+                        registerErrors.email
+                          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                          : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      }`}
                     />
+                    {registerErrors.email && (
+                      <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{registerErrors.email.message}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-password" className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
@@ -275,9 +386,29 @@ export function AuthPage() {
                       id="register-password"
                       type="password"
                       placeholder="Mínimo 6 caracteres"
-                      {...registerRegisterForm("password", { required: true, minLength: 6 })}
-                      className="h-12 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                      {...registerRegisterForm("password", {
+                        required: "A senha é obrigatória",
+                        minLength: {
+                          value: 6,
+                          message: "A senha deve ter pelo menos 6 caracteres"
+                        },
+                        maxLength: {
+                          value: 100,
+                          message: "A senha deve ter no máximo 100 caracteres"
+                        }
+                      })}
+                      className={`h-12 border-2 rounded-xl ${
+                        registerErrors.password
+                          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                          : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      }`}
                     />
+                    {registerErrors.password && (
+                      <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{registerErrors.password.message}</span>
+                      </div>
+                    )}
                   </div>
                   <Button
                     type="submit"

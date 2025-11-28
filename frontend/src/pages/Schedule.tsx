@@ -14,6 +14,8 @@ import { Select } from "../components/ui/Select";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Calendar, Clock, DollarSign, CheckCircle, XCircle, AlertCircle, Sparkles, Car, MapPin } from "lucide-react";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { AlertDialog } from "../components/ui/AlertDialog";
 
 interface ScheduleForm {
   serviceId: string;
@@ -35,6 +37,19 @@ export function SchedulePage() {
   const [myAppointments, setMyAppointments] = useState<Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [generalSettings, setGeneralSettings] = useState<{ workDays: string; closedDates: string[] } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: "warning" | "danger" | "info" | "success";
+  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: "error" | "success" | "info" | "warning";
+  }>({ isOpen: false, title: "", message: "" });
   const { user } = useAuthStore();
   const {
     register,
@@ -617,25 +632,37 @@ export function SchedulePage() {
                                 variant="outline"
                                 size="sm"
                                 className="h-7 px-3 text-xs border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
-                                onClick={async () => {
-                                  if (!confirm("Tem certeza que deseja cancelar este agendamento?")) {
-                                    return;
-                                  }
-                                  try {
-                                    await updateAppointmentStatus(appointment.id, "CANCELADO");
-                                    const data = await listAppointments();
-                                    const now = new Date();
-                                    const filtered = data.filter((apt) => {
-                                      const aptDate = new Date(apt.date);
-                                      return aptDate >= now || isSameDay(aptDate, now);
-                                    });
-                                    setMyAppointments(
-                                      filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                                    );
-                                  } catch (error: any) {
-                                    console.error(error);
-                                    alert(error.response?.data?.message || "Erro ao cancelar agendamento.");
-                                  }
+                                onClick={() => {
+                                  setConfirmDialog({
+                                    isOpen: true,
+                                    title: "Cancelar Agendamento",
+                                    message: "Tem certeza que deseja cancelar este agendamento?",
+                                    type: "danger",
+                                    onConfirm: async () => {
+                                      try {
+                                        await updateAppointmentStatus(appointment.id, "CANCELADO");
+                                        const data = await listAppointments();
+                                        const now = new Date();
+                                        const filtered = data.filter((apt) => {
+                                          const aptDate = new Date(apt.date);
+                                          return aptDate >= now || isSameDay(aptDate, now);
+                                        });
+                                        setMyAppointments(
+                                          filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                                        );
+                                        setConfirmDialog({ ...confirmDialog, isOpen: false });
+                                      } catch (error: any) {
+                                        console.error(error);
+                                        setConfirmDialog({ ...confirmDialog, isOpen: false });
+                                        setAlertDialog({
+                                          isOpen: true,
+                                          title: "Erro",
+                                          message: error.response?.data?.message || "Erro ao cancelar agendamento.",
+                                          type: "error"
+                                        });
+                                      }
+                                    }
+                                  });
                                 }}
                               >
                                 <XCircle className="h-3 w-3 mr-1" />
@@ -669,6 +696,23 @@ export function SchedulePage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+      />
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        type={alertDialog.type}
+      />
     </div>
   );
 }

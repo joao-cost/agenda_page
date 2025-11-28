@@ -8,6 +8,7 @@ import {
   updateAppointmentSchema
 } from "../schemas/appointment";
 import { notifyNewAppointment, notifyStatusChange, notifyCancellation } from "../services/whatsapp.service";
+import { tryLockAppointmentSlot, findAvailableWasher } from "../services/appointment-lock.service";
 import { addMinutes, endOfDay, format, isBefore, isSameDay, setHours, setMilliseconds, setMinutes, setSeconds, startOfDay } from "date-fns";
 import ptBR from "date-fns/locale/pt-BR";
 
@@ -298,85 +299,47 @@ export const appointmentController = {
 
     // Atribuição automática de lavador se multi-washer estiver ativo e não foi especificado
     let effectiveWasherId = washerId || null;
+    const appointmentDate = new Date(date);
+    const maxConcurrent = generalSettings?.maxConcurrentBookings || 1;
+
+    // Se multi-lavador está ativo e washerId não foi fornecido, encontrar lavador disponível
     if (!effectiveWasherId && generalSettings?.multiWasher) {
       const washers = generalSettings.washers ? JSON.parse(generalSettings.washers) : [];
       if (washers.length > 0) {
-        // Buscar agendamentos do dia para verificar conflitos por lavador
-        const appointmentDate = new Date(date);
-        const appointmentEnd = addMinutes(appointmentDate, service.durationMin);
+        console.log(`[Appointment] Buscando lavador disponível para ${washers.length} lavador(es) no horário ${format(appointmentDate, "dd/MM/yyyy HH:mm")}`);
         
-        // Buscar TODOS os agendamentos do dia (incluindo os sem washerId)
-        const dayStart = startOfDay(appointmentDate);
-        const dayEnd = endOfDay(appointmentDate);
-        
-        const dayAppointments = await prisma.appointment.findMany({
-          where: {
-            date: {
-              gte: dayStart,
-              lte: dayEnd
-            },
-            status: {
-              not: "CANCELADO"
-            }
-          },
-          include: {
-            service: true
-          }
-        });
+        // Usar serviço de lock para encontrar lavador disponível com controle de concorrência
+        const availableWasher = await findAvailableWasher(
+          appointmentDate,
+          service.durationMin,
+          washers,
+          maxConcurrent
+        );
 
-        // Para cada lavador, verificar se há conflito de horário
-        const maxConcurrent = generalSettings.maxConcurrentBookings || 1;
-        const washerAvailability: Array<{ id: string; name: string; hasConflict: boolean; overlappingCount: number }> = [];
-        
-        console.log(`[Appointment] Verificando disponibilidade para ${washers.length} lavador(es) no horário ${format(appointmentDate, "dd/MM/yyyy HH:mm")}`);
-        console.log(`[Appointment] Total de agendamentos do dia: ${dayAppointments.length}`);
-        
-        for (const washer of washers) {
-          // Buscar agendamentos deste lavador que sobrepõem com o novo agendamento
-          const washerAppointments = dayAppointments.filter((apt) => apt.washerId === washer.id);
-          
-          console.log(`[Appointment] Lavador ${washer.name} (${washer.id}): ${washerAppointments.length} agendamento(s) no dia`);
-          
-          const overlappingAppointments = washerAppointments.filter((apt) => {
-            const aptStart = apt.date;
-            const aptEnd = addMinutes(aptStart, apt.service.durationMin);
-            // Verifica sobreposição: aptStart < appointmentEnd && aptEnd > appointmentDate
-            const overlaps = aptStart < appointmentEnd && aptEnd > appointmentDate;
-            if (overlaps) {
-              console.log(`[Appointment] Conflito detectado: ${washer.name} tem agendamento de ${format(aptStart, "HH:mm")} até ${format(aptEnd, "HH:mm")}`);
-            }
-            return overlaps;
-          });
-
-          const overlappingCount = overlappingAppointments.length;
-          // Há conflito se já atingiu o máximo de agendamentos simultâneos
-          const hasConflict = overlappingCount >= maxConcurrent;
-
-          console.log(`[Appointment] Lavador ${washer.name}: ${overlappingCount} sobreposição(ões), maxConcurrent: ${maxConcurrent}, hasConflict: ${hasConflict}`);
-
-          washerAvailability.push({
-            id: washer.id,
-            name: washer.name,
-            hasConflict,
-            overlappingCount
-          });
-        }
-
-        // Prioridade 1: Escolher lavador SEM conflito
-        const availableWashers = washerAvailability.filter((w) => !w.hasConflict);
-        if (availableWashers.length > 0) {
-          // Se há múltiplos disponíveis, escolher o com menos agendamentos sobrepostos
-          availableWashers.sort((a, b) => a.overlappingCount - b.overlappingCount);
-          effectiveWasherId = availableWashers[0].id;
-          console.log(`[Appointment] Lavador atribuído automaticamente: ${availableWashers[0].name} (ID: ${effectiveWasherId})`);
+        if (availableWasher) {
+          effectiveWasherId = availableWasher.washerId;
+          console.log(`[Appointment] Lavador atribuído automaticamente: ${availableWasher.name} (ID: ${effectiveWasherId})`);
         } else {
-          // Se todos os lavadores estão ocupados, não há disponibilidade
           console.log(`[Appointment] Todos os lavadores estão ocupados no horário ${format(appointmentDate, "dd/MM/yyyy HH:mm")}`);
           return res.status(400).json({ 
             message: `Não há disponibilidade neste horário. Todos os ${washers.length} lavador(es) estão ocupados.` 
           });
         }
       }
+    }
+
+    // Verificar disponibilidade final com lock (prevenir race condition)
+    const lockResult = await tryLockAppointmentSlot(
+      appointmentDate,
+      service.durationMin,
+      effectiveWasherId,
+      maxConcurrent
+    );
+
+    if (!lockResult.success) {
+      return res.status(400).json({ 
+        message: lockResult.message || "Não há disponibilidade neste horário." 
+      });
     }
 
     const appointment = await prisma.appointment.create({
@@ -525,8 +488,66 @@ export const appointmentController = {
       }
     }
 
+    if (parseResult.data.date || parseResult.data.washerId !== undefined) {
+      // Se está alterando data ou lavador, verificar conflitos
+      const newDate = parseResult.data.date ? new Date(parseResult.data.date) : appointment.date;
+      const newWasherId = parseResult.data.washerId !== undefined ? parseResult.data.washerId : appointment.washerId;
+      
+      // Buscar configurações para maxConcurrent
+      const generalSettings = await prisma.generalSettings.findUnique({
+        where: { id: "default" }
+      });
+      const maxConcurrent = generalSettings?.maxConcurrentBookings || 1;
+      
+      // Verificar conflitos (excluindo o próprio agendamento)
+      const lockResult = await tryLockAppointmentSlot(
+        newDate,
+        appointment.service.durationMin,
+        newWasherId,
+        maxConcurrent
+      );
+      
+      // Verificar conflitos manualmente excluindo o próprio agendamento
+      const dayStart = startOfDay(newDate);
+      const dayEnd = endOfDay(newDate);
+      const appointmentEnd = addMinutes(newDate, appointment.service.durationMin);
+      
+      const conflictingAppointments = await prisma.appointment.findMany({
+        where: {
+          id: { not: id }, // Excluir o próprio agendamento
+          date: {
+            gte: dayStart,
+            lte: dayEnd
+          },
+          status: {
+            not: "CANCELADO"
+          },
+          ...(newWasherId ? { washerId: newWasherId } : { washerId: { not: null } })
+        },
+        include: {
+          service: true
+        }
+      });
+      
+      const overlappingCount = conflictingAppointments.filter((apt) => {
+        const aptStart = apt.date;
+        const aptEnd = addMinutes(aptStart, apt.service.durationMin);
+        return aptStart < appointmentEnd && aptEnd > newDate;
+      }).length;
+      
+      if (overlappingCount >= maxConcurrent) {
+        return res.status(400).json({
+          message: `Não é possível alterar para este horário. Já existem ${overlappingCount} agendamento(s) sobrepostos.`
+        });
+      }
+    }
+
     if (parseResult.data.date) {
       updateData.date = new Date(parseResult.data.date);
+    }
+
+    if (parseResult.data.washerId !== undefined) {
+      updateData.washerId = parseResult.data.washerId;
     }
 
     if (parseResult.data.notes !== undefined) {

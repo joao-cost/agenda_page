@@ -8,6 +8,8 @@ import { useIsMobile } from "../../utils/useIsMobile";
 import { KanbanColumn } from "./KanbanColumn";
 import { DashboardStats } from "./DashboardStats";
 import { AppointmentDetailsModal } from "../../components/modals/AppointmentDetailsModal";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { AlertDialog } from "../../components/ui/AlertDialog";
 
 const columns: { status: AppointmentStatus; title: string }[] = [
   { status: "AGENDADO", title: "Agendado" },
@@ -23,6 +25,19 @@ export function DashboardKanban() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: "warning" | "danger" | "info" | "success";
+  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: "error" | "success" | "info" | "warning";
+  }>({ isOpen: false, title: "", message: "" });
   const isMobile = useIsMobile();
 
   const sensors = useSensors(
@@ -92,7 +107,12 @@ export function DashboardKanban() {
     if (currentIndex > nextIndex) {
       // Tentando voltar para trás
       if (appointment.status === "LAVANDO" || appointment.status === "ENTREGUE") {
-        alert("Não é possível voltar o status após iniciar a lavagem.");
+        setAlertDialog({
+          isOpen: true,
+          title: "Ação não permitida",
+          message: "Não é possível voltar o status após iniciar a lavagem.",
+          type: "warning"
+        });
         return;
       }
     }
@@ -106,17 +126,29 @@ export function DashboardKanban() {
     };
 
     const confirmMessage = `Deseja realmente alterar o status de "${statusLabels[appointment.status]}" para "${statusLabels[nextStatus]}"?`;
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-
-    try {
-      const updated = await updateAppointmentStatus(id, nextStatus);
-      setAppointments((prev) => prev.map((item) => (item.id === id ? updated : item)));
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao atualizar status. Tente novamente.");
-    }
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: "Confirmar alteração de status",
+      message: confirmMessage,
+      type: "warning",
+      onConfirm: async () => {
+        try {
+          const updated = await updateAppointmentStatus(id, nextStatus);
+          setAppointments((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+        } catch (error) {
+          console.error(error);
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          setAlertDialog({
+            isOpen: true,
+            title: "Erro",
+            message: "Erro ao atualizar status. Tente novamente.",
+            type: "error"
+          });
+        }
+      }
+    });
   };
 
   const handleMarkPaid = async (appointment: Appointment) => {
@@ -199,7 +231,12 @@ export function DashboardKanban() {
     if (currentIndex > nextIndex) {
       // Tentando voltar para trás
       if (appointment.status === "LAVANDO" || appointment.status === "ENTREGUE") {
-        alert("Não é possível voltar o status após iniciar a lavagem.");
+        setAlertDialog({
+          isOpen: true,
+          title: "Ação não permitida",
+          message: "Não é possível voltar o status após iniciar a lavagem.",
+          type: "warning"
+        });
         return;
       }
     }
@@ -213,11 +250,29 @@ export function DashboardKanban() {
     };
 
     const confirmMessage = `Deseja realmente alterar o status de "${statusLabels[appointment.status]}" para "${statusLabels[targetStatus]}"?`;
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-
-    await handleAdvance(appointmentId, targetStatus);
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: "Confirmar alteração de status",
+      message: confirmMessage,
+      type: "warning",
+      onConfirm: async () => {
+        try {
+          const updated = await updateAppointmentStatus(appointmentId, targetStatus);
+          setAppointments((prev) => prev.map((item) => (item.id === appointmentId ? updated : item)));
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+        } catch (error) {
+          console.error(error);
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          setAlertDialog({
+            isOpen: true,
+            title: "Erro",
+            message: "Erro ao atualizar status. Tente novamente.",
+            type: "error"
+          });
+        }
+      }
+    });
   };
 
   const activeAppointment = activeId ? appointments.find((a) => a.id === activeId) : null;
@@ -311,6 +366,23 @@ export function DashboardKanban() {
         onUpdate={() => {
           fetchAppointments();
         }}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+      />
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        type={alertDialog.type}
       />
     </div>
   );

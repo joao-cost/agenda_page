@@ -30,8 +30,8 @@ export function DashboardClients() {
     register,
     handleSubmit,
     reset,
-    formState: { isSubmitting }
-  } = useForm<ClientForm>();
+    formState: { errors, isSubmitting }
+  } = useForm<ClientForm>({ mode: "onChange" });
 
   useEffect(() => {
     async function fetchClients() {
@@ -224,10 +224,34 @@ export function DashboardClients() {
                   </Label>
                   <Input 
                     id="name" 
-                    {...register("name", { required: true })}
-                    className="h-11 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                    {...register("name", {
+                      required: "O nome é obrigatório",
+                      minLength: {
+                        value: 3,
+                        message: "O nome deve ter pelo menos 3 caracteres"
+                      },
+                      maxLength: {
+                        value: 100,
+                        message: "O nome deve ter no máximo 100 caracteres"
+                      },
+                      pattern: {
+                        value: /^[a-zA-ZÀ-ÿ\s]+$/,
+                        message: "O nome pode conter apenas letras e espaços"
+                      }
+                    })}
+                    className={`h-11 border-2 rounded-xl ${
+                      errors.name
+                        ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                        : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    }`}
                     placeholder="Ex: João Silva"
                   />
+                  {errors.name && (
+                    <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{errors.name.message}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone" className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
@@ -236,10 +260,35 @@ export function DashboardClients() {
                   </Label>
                   <Input 
                     id="phone" 
-                    {...register("phone", { required: true })}
-                    className="h-11 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                    type="tel"
+                    {...register("phone", {
+                      required: "O telefone é obrigatório",
+                      pattern: {
+                        value: /^[\d\s\(\)\-]+$/,
+                        message: "Formato de telefone inválido"
+                      },
+                      minLength: {
+                        value: 10,
+                        message: "O telefone deve ter pelo menos 10 dígitos"
+                      },
+                      maxLength: {
+                        value: 15,
+                        message: "O telefone deve ter no máximo 15 caracteres"
+                      }
+                    })}
+                    className={`h-11 border-2 rounded-xl ${
+                      errors.phone
+                        ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                        : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    }`}
                     placeholder="Ex: 66996586980"
                   />
+                  {errors.phone && (
+                    <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{errors.phone.message}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="vehicle" className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
@@ -249,9 +298,29 @@ export function DashboardClients() {
                   <Input 
                     id="vehicle" 
                     placeholder="Ex: Honda Civic, Fiat Uno..." 
-                    {...register("vehicle", { required: true })}
-                    className="h-11 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                    {...register("vehicle", {
+                      required: "O veículo é obrigatório",
+                      minLength: {
+                        value: 3,
+                        message: "O veículo deve ter pelo menos 3 caracteres"
+                      },
+                      maxLength: {
+                        value: 100,
+                        message: "O veículo deve ter no máximo 100 caracteres"
+                      }
+                    })}
+                    className={`h-11 border-2 rounded-xl ${
+                      errors.vehicle
+                        ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                        : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    }`}
                   />
+                  {errors.vehicle && (
+                    <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{errors.vehicle.message}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="plate" className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
@@ -261,15 +330,37 @@ export function DashboardClients() {
                   <Input 
                     id="plate" 
                     placeholder="Ex: ABC1234 ou ABC1D23" 
+                    maxLength={7}
                     {...register("plate", {
                       setValueAs: (value: string) => {
                         if (!value) return value;
                         return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7);
+                      },
+                      pattern: {
+                        value: /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$|^[A-Z]{3}[0-9]{4}$/,
+                        message: "Formato de placa inválido. Use ABC1234 ou ABC1D23"
+                      },
+                      validate: (value) => {
+                        if (!value) return true; // Opcional
+                        const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        if (cleaned.length < 7) {
+                          return "A placa deve ter 7 caracteres";
+                        }
+                        return true;
                       }
                     })}
-                    maxLength={7}
-                    className="h-11 border-2 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl"
+                    className={`h-11 border-2 rounded-xl ${
+                      errors.plate
+                        ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                        : "border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    }`}
                   />
+                  {errors.plate && (
+                    <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{errors.plate.message}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="notes" className="text-sm font-semibold text-secondary-900 flex items-center gap-2">

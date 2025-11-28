@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { fetchDailyRevenue, fetchMonthlyRevenue, fetchPendingPayments, type RevenueSummary, type PendingPaymentsResponse } from "../../api/reports";
+import { updatePaymentStatus } from "../../api/payments";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { AlertDialog } from "../../components/ui/AlertDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { Label } from "../../components/ui/Label";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { updatePaymentStatus } from "../../api/payments";
 import { DollarSign } from "lucide-react";
 
 export function DashboardReports() {
@@ -17,6 +19,19 @@ export function DashboardReports() {
   const [loadingPending, setLoadingPending] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), "yyyy-MM"));
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: "warning" | "danger" | "info" | "success";
+  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: "error" | "success" | "info" | "warning";
+  }>({ isOpen: false, title: "", message: "" });
 
   useEffect(() => {
     async function loadDaily() {
@@ -154,26 +169,38 @@ export function DashboardReports() {
                       </div>
                       <Button
                         type="button"
-                        onClick={async () => {
-                          if (!confirm(`Deseja marcar o pagamento de ${apt.clientName} como pago?`)) {
-                            return;
-                          }
-                          try {
-                            await updatePaymentStatus(apt.paymentId, "PAGO");
-                            // Recarregar pendências
-                            const data = await fetchPendingPayments();
-                            setPendingPayments(data);
-                            // Recarregar resumos também
-                            const [daily, monthly] = await Promise.all([
-                              fetchDailyRevenue(selectedDate),
-                              fetchMonthlyRevenue(selectedMonth)
-                            ]);
-                            setDailySummary(daily);
-                            setMonthlySummary(monthly);
-                          } catch (error: any) {
-                            console.error(error);
-                            alert(error.response?.data?.message || "Erro ao marcar como pago.");
-                          }
+                        onClick={() => {
+                          setConfirmDialog({
+                            isOpen: true,
+                            title: "Marcar como Pago",
+                            message: `Deseja marcar o pagamento de ${apt.clientName} como pago?`,
+                            type: "success",
+                            onConfirm: async () => {
+                              try {
+                                await updatePaymentStatus(apt.paymentId, "PAGO");
+                                // Recarregar pendências
+                                const data = await fetchPendingPayments();
+                                setPendingPayments(data);
+                                // Recarregar resumos também
+                                const [daily, monthly] = await Promise.all([
+                                  fetchDailyRevenue(selectedDate),
+                                  fetchMonthlyRevenue(selectedMonth)
+                                ]);
+                                setDailySummary(daily);
+                                setMonthlySummary(monthly);
+                                setConfirmDialog({ ...confirmDialog, isOpen: false });
+                              } catch (error: any) {
+                                console.error(error);
+                                setConfirmDialog({ ...confirmDialog, isOpen: false });
+                                setAlertDialog({
+                                  isOpen: true,
+                                  title: "Erro",
+                                  message: error.response?.data?.message || "Erro ao marcar como pago.",
+                                  type: "error"
+                                });
+                              }
+                            }
+                          });
                         }}
                         className="w-full h-8 text-xs bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
                       >
@@ -194,6 +221,23 @@ export function DashboardReports() {
         </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+      />
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        type={alertDialog.type}
+      />
     </div>
   );
 }

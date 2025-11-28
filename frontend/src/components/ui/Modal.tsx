@@ -36,13 +36,13 @@ export function Modal({ isOpen, onClose, title, children, size = "md", className
   return (
     <>
       <div
-        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 max-h-screen overflow-hidden">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 max-h-screen overflow-hidden pointer-events-none">
         <div
           className={cn(
-            "relative w-full rounded-2xl border-2 border-primary/30 bg-white shadow-2xl max-h-[calc(100vh-2rem)] flex flex-col",
+            "relative w-full rounded-2xl border-2 border-primary/30 bg-white shadow-2xl max-h-[calc(100vh-2rem)] flex flex-col pointer-events-auto",
             sizeClasses[size],
             className
           )}
