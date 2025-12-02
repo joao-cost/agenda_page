@@ -31,13 +31,23 @@ export function DashboardStats() {
         const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
 
         // Buscar agendamentos de hoje
+        const todayStart = startOfDay(new Date());
+        const todayEnd = new Date(todayStart);
+        todayEnd.setHours(23, 59, 59, 999);
+
         const todayAppointments = await listAppointments({
-          date: format(today, "yyyy-MM-dd")
+          start: todayStart.toISOString(),
+          end: todayEnd.toISOString()
         });
 
         // Buscar agendamentos de amanhã
+        const tomorrowStart = startOfDay(addDays(new Date(), 1));
+        const tomorrowEnd = new Date(tomorrowStart);
+        tomorrowEnd.setHours(23, 59, 59, 999);
+
         const tomorrowAppointments = await listAppointments({
-          date: format(tomorrow, "yyyy-MM-dd")
+          start: tomorrowStart.toISOString(),
+          end: tomorrowEnd.toISOString()
         });
 
         // Buscar agendamentos da semana

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { format, parseISO, startOfDay } from "date-fns";
+import { format, parseISO, startOfDay, addDays, subDays, isSameDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCorners } from "@dnd-kit/core";
 import { listAppointments, updateAppointmentStatus } from "../../api/appointments";
 import type { Appointment, AppointmentStatus } from "../../types";
@@ -10,6 +11,7 @@ import { DashboardStats } from "./DashboardStats";
 import { AppointmentDetailsModal } from "../../components/modals/AppointmentDetailsModal";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { AlertDialog } from "../../components/ui/AlertDialog";
+import { Button } from "../../components/ui/Button";
 
 const columns: { status: AppointmentStatus; title: string }[] = [
   { status: "AGENDADO", title: "Agendado" },
@@ -31,7 +33,7 @@ export function DashboardKanban() {
     message: string;
     onConfirm: () => void;
     type?: "warning" | "danger" | "info" | "success";
-  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+  }>({ isOpen: false, title: "", message: "", onConfirm: () => { } });
   const [alertDialog, setAlertDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -57,8 +59,8 @@ export function DashboardKanban() {
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
-      
-      const data = await listAppointments({ 
+
+      const data = await listAppointments({
         start: startOfDay.toISOString(),
         end: endOfDay.toISOString()
       });
@@ -126,7 +128,7 @@ export function DashboardKanban() {
     };
 
     const confirmMessage = `Deseja realmente alterar o status de "${statusLabels[appointment.status]}" para "${statusLabels[nextStatus]}"?`;
-    
+
     setConfirmDialog({
       isOpen: true,
       title: "Confirmar alteração de status",
@@ -194,8 +196,8 @@ export function DashboardKanban() {
       // Se for um card, buscar o elemento DOM e encontrar o parent com data-column-status
       try {
         const overElement = document.querySelector(`[data-draggable-id="${over.id}"]`) ||
-                           document.querySelector(`[data-droppable-id="${over.id}"]`);
-        
+          document.querySelector(`[data-droppable-id="${over.id}"]`);
+
         if (overElement) {
           // Buscar o elemento pai mais próximo com data-column-status
           const columnElement = overElement.closest('[data-column-status]');
@@ -209,7 +211,7 @@ export function DashboardKanban() {
       } catch (e) {
         console.warn("Erro ao buscar elemento DOM:", e);
       }
-      
+
       // Fallback: se não encontrar pelo DOM, tentar pelo appointment
       if (!targetStatus) {
         const targetAppointment = appointments.find((a) => a.id === over.id);
@@ -250,7 +252,7 @@ export function DashboardKanban() {
     };
 
     const confirmMessage = `Deseja realmente alterar o status de "${statusLabels[appointment.status]}" para "${statusLabels[targetStatus]}"?`;
-    
+
     setConfirmDialog({
       isOpen: true,
       title: "Confirmar alteração de status",
@@ -291,10 +293,36 @@ export function DashboardKanban() {
     ENTREGUE: "from-green-500/10 to-green-600/5 border-green-300/30"
   };
 
+  const getDateDisplay = () => {
+    if (isSameDay(selectedDate, new Date())) return "Hoje";
+    if (isSameDay(selectedDate, subDays(new Date(), 1))) return "Ontem";
+    if (isSameDay(selectedDate, addDays(new Date(), 1))) return "Amanhã";
+    return format(selectedDate, "dd 'de' MMMM", { locale: ptBR });
+  };
+
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 mb-4">
+      <div className="flex-shrink-0 mb-4 space-y-4">
         <DashboardStats />
+        <div className="flex items-center justify-center gap-4 bg-white p-2 rounded-xl shadow-sm border border-primary/10 w-fit mx-auto">
+          <Button
+            variant="ghost"
+            onClick={() => setSelectedDate((prev) => subDays(prev, 1))}
+            className="h-8 w-8 p-0 rounded-full hover:bg-primary/10"
+          >
+            ←
+          </Button>
+          <span className="text-sm font-bold text-secondary-900 min-w-[100px] text-center capitalize">
+            {getDateDisplay()}
+          </span>
+          <Button
+            variant="ghost"
+            onClick={() => setSelectedDate((prev) => addDays(prev, 1))}
+            className="h-8 w-8 p-0 rounded-full hover:bg-primary/10"
+          >
+            →
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto min-h-0">
@@ -305,54 +333,54 @@ export function DashboardKanban() {
           onDragEnd={handleDragEnd}
         >
           <div className="grid gap-6 lg:grid-cols-3 h-full items-stretch">
-          {columns.map((column) => {
-            const columnAppointments = appointments.filter((appt) => appt.status === column.status);
-            return (
+            {columns.map((column) => {
+              const columnAppointments = appointments.filter((appt) => appt.status === column.status);
+              return (
                 <KanbanColumn
-                key={column.status}
-                status={column.status}
-                title={column.title}
-                appointments={columnAppointments}
-                getNextStatus={getNextStatus}
-                onAdvance={handleAdvance}
-                onMarkPaid={handleMarkPaid}
-                onCardClick={(appointment) => {
-                  setSelectedAppointment(appointment);
-                  setIsDetailsOpen(true);
-                }}
-                isMobile={isMobile}
-                colorClass={columnColors[column.status]}
-              />
-            );
-          })}
-        </div>
-        <DragOverlay>
-          {activeAppointment ? (
-            <div className="rounded-xl border-2 border-primary bg-white p-3 shadow-2xl">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-bold text-secondary-900 truncate">
-                    {activeAppointment.client.name}
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-secondary-600 truncate">
-                      {activeAppointment.client.vehicle}
-                    </p>
-                    {activeAppointment.client.plate && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gradient-to-r from-primary to-accent text-white shadow-sm flex-shrink-0">
-                        {activeAppointment.client.plate}
-                      </span>
-                    )}
+                  key={column.status}
+                  status={column.status}
+                  title={column.title}
+                  appointments={columnAppointments}
+                  getNextStatus={getNextStatus}
+                  onAdvance={handleAdvance}
+                  onMarkPaid={handleMarkPaid}
+                  onCardClick={(appointment) => {
+                    setSelectedAppointment(appointment);
+                    setIsDetailsOpen(true);
+                  }}
+                  isMobile={isMobile}
+                  colorClass={columnColors[column.status]}
+                />
+              );
+            })}
+          </div>
+          <DragOverlay>
+            {activeAppointment ? (
+              <div className="rounded-xl border-2 border-primary bg-white p-3 shadow-2xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-bold text-secondary-900 truncate">
+                      {activeAppointment.client.name}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-secondary-600 truncate">
+                        {activeAppointment.client.vehicle}
+                      </p>
+                      {activeAppointment.client.plate && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gradient-to-r from-primary to-accent text-white shadow-sm flex-shrink-0">
+                          {activeAppointment.client.plate}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <span className="rounded-full bg-gradient-to-r from-primary to-accent px-2 py-1 text-xs font-bold text-white shadow-md flex-shrink-0">
+                    {format(new Date(activeAppointment.date), "HH:mm")}
+                  </span>
                 </div>
-                <span className="rounded-full bg-gradient-to-r from-primary to-accent px-2 py-1 text-xs font-bold text-white shadow-md flex-shrink-0">
-                  {format(new Date(activeAppointment.date), "HH:mm")}
-                </span>
               </div>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       {/* Modal de Detalhes */}

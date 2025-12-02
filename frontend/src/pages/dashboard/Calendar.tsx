@@ -25,6 +25,7 @@ import { Badge } from "../../components/ui/Badge";
 import { NewAppointmentModal } from "../../components/modals/NewAppointmentModal";
 import { AppointmentDetailsModal } from "../../components/modals/AppointmentDetailsModal";
 import { EditAppointmentModal } from "../../components/modals/EditAppointmentModal";
+import { calculateAppointmentLayout } from "../../utils/calendarLayout";
 
 const WORK_START_HOUR = 8;
 const WORK_END_HOUR = 18;
@@ -89,7 +90,7 @@ export function DashboardCalendar() {
       // Calcular o range dinamicamente baseado no anchorDate atual
       let start: Date;
       let end: Date;
-      
+
       if (isMultiWasherMode) {
         start = startOfDay(anchorDate);
         end = endOfDay(anchorDate); // Fim do dia, não início!
@@ -97,7 +98,7 @@ export function DashboardCalendar() {
         start = startOfWeek(anchorDate, { weekStartsOn: 1 });
         end = endOfWeek(anchorDate, { weekStartsOn: 1 });
       }
-      
+
       const data = await listAppointments({
         start: start.toISOString(),
         end: end.toISOString()
@@ -124,9 +125,9 @@ export function DashboardCalendar() {
       isMultiWasherMode
         ? [anchorDate] // No modo multi-lavador, apenas o dia selecionado
         : eachDayOfInterval({
-            start: visibleRange.start,
-            end: visibleRange.end
-          }),
+          start: visibleRange.start,
+          end: visibleRange.end
+        }),
     [visibleRange, anchorDate, isMultiWasherMode]
   );
 
@@ -139,26 +140,18 @@ export function DashboardCalendar() {
     if (!isMultiWasherMode || !settings?.washers) return {};
     const dayKey = format(anchorDate, "yyyy-MM-dd");
     const dayAppointments = appointmentsByDay[dayKey] || [];
-    
+
     const result: Record<string, Appointment[]> = {};
     settings.washers.forEach((washer) => {
       result[washer.id] = dayAppointments.filter((apt) => apt.washerId === washer.id);
     });
-    
-    // Agendamentos sem washerId atribuído: distribuir no primeiro lavador ou criar uma categoria "Sem lavador"
-    const unassignedAppointments = dayAppointments.filter((apt) => !apt.washerId);
-    if (unassignedAppointments.length > 0 && settings.washers.length > 0) {
-      // Atribuir ao primeiro lavador como fallback
-      const firstWasherId = settings.washers[0].id;
-      result[firstWasherId] = [...(result[firstWasherId] || []), ...unassignedAppointments];
-    }
-    
+
     return result;
   }, [appointmentsByDay, anchorDate, isMultiWasherMode, settings?.washers]);
 
   const hours = useMemo(() => {
     const list: number[] = [];
-    for (let hour = WORK_START_HOUR; hour <= WORK_END_HOUR; hour++) {
+    for (let hour = WORK_START_HOUR; hour < WORK_END_HOUR; hour++) {
       list.push(hour);
     }
     return list;
@@ -170,12 +163,18 @@ export function DashboardCalendar() {
     return eachDayOfInterval({ start, end });
   }, [monthCursor]);
 
+  // Preparar lista de colunas para renderizar (apenas Lavadores)
+  const columnsToRender = useMemo(() => {
+    if (!settings?.washers) return [];
+    return settings.washers;
+  }, [settings?.washers]);
+
   return (
     <div className="h-full flex flex-col gap-6 lg:flex-row overflow-hidden">
       <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-2 border-blue-300/30 shadow-xl lg:w-72 flex-shrink-0 h-full flex flex-col overflow-hidden">
         <CardHeader className="space-y-4 border-b border-primary/20 pb-4 flex-shrink-0">
           <CardTitle className="text-xl font-bold text-secondary-900">Agenda</CardTitle>
-          <Button 
+          <Button
             onClick={() => setIsNewAppointmentOpen(true)}
             className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-lg"
           >
@@ -226,13 +225,12 @@ export function DashboardCalendar() {
                     setAnchorDate(day);
                     setMonthCursor(day);
                   }}
-                  className={`relative flex h-10 w-10 items-center justify-center rounded-lg border-2 transition-all ${
-                    isSelected
-                      ? "border-primary bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 scale-105"
-                      : isToday
+                  className={`relative flex h-10 w-10 items-center justify-center rounded-lg border-2 transition-all ${isSelected
+                    ? "border-primary bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 scale-105"
+                    : isToday
                       ? "border-primary/50 bg-primary/10 text-primary font-bold ring-2 ring-primary/30"
                       : "border-transparent bg-white/50 text-secondary-700 hover:border-primary/40 hover:bg-primary/10 hover:scale-105"
-                  } ${!isCurrentMonth ? "opacity-40" : ""}`}
+                    } ${!isCurrentMonth ? "opacity-40" : ""}`}
                 >
                   <span className="text-sm font-semibold">{format(day, "d")}</span>
                   {hasAppointments && !isSelected ? (
@@ -325,8 +323,8 @@ export function DashboardCalendar() {
                 </Button>
               </>
             )}
-            <Button 
-              type="button" 
+            <Button
+              type="button"
               className="bg-gradient-to-r from-primary to-accent text-white shadow-lg hover:shadow-xl"
               onClick={() => setAnchorDate(new Date())}
             >
@@ -347,32 +345,32 @@ export function DashboardCalendar() {
             <div className="min-w-[720px]">
               {isMultiWasherMode && settings?.washers ? (
                 <>
-                  <div 
-                    className="grid gap-0 border-b-2 border-primary/20 sticky top-0 bg-white z-10"
+                  <div
+                    className="grid gap-0 border-b-2 border-primary/20 sticky top-0 bg-white z-50 shadow-md"
                     style={{
-                      gridTemplateColumns: `80px repeat(${settings.washers.length}, minmax(0, 1fr))`
+                      gridTemplateColumns: `80px repeat(${columnsToRender.length}, minmax(0, 1fr))`
                     }}
                   >
-                    <div className="bg-gradient-to-br from-primary/10 to-primary/5 border-r-2 border-primary/20"></div>
-                    {settings.washers.map((washer) => (
+                    <div className="bg-white border-r-2 border-primary/20"></div>
+                    {columnsToRender.map((washer) => (
                       <div
                         key={washer.id}
-                        className="border-r-2 border-primary/20 px-3 py-3 text-center bg-gradient-to-br from-primary/20 to-primary/10 last:border-r-0"
+                        className="border-r-2 border-primary/20 px-3 py-3 text-center bg-secondary text-white last:border-r-0"
                       >
-                        <p className="text-xs uppercase tracking-wide font-bold text-secondary-600">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-primary-200 opacity-90">
                           Lavador
                         </p>
-                        <p className="text-lg font-bold text-primary">
+                        <p className="text-lg font-bold tracking-tight">
                           {washer.name}
                         </p>
                       </div>
                     ))}
                   </div>
 
-                  <div 
+                  <div
                     className="grid gap-0"
                     style={{
-                      gridTemplateColumns: `80px repeat(${settings.washers.length}, minmax(0, 1fr))`
+                      gridTemplateColumns: `80px repeat(${columnsToRender.length}, minmax(0, 1fr))`
                     }}
                   >
                     <div className="flex flex-col border-r-2 border-primary/20">
@@ -385,11 +383,13 @@ export function DashboardCalendar() {
                       ))}
                     </div>
 
-                    {settings.washers.map((washer) => {
+                    {columnsToRender.map((washer) => {
                       const washerAppointments = appointmentsByWasher[washer.id] || [];
+                      const layoutAppointments = calculateAppointmentLayout(washerAppointments);
+
                       return (
-                        <div 
-                          key={washer.id} 
+                        <div
+                          key={washer.id}
                           className="relative border-r-2 border-primary/20 bg-primary/5 last:border-r-0"
                         >
                           {hours.map((hour) => (
@@ -405,7 +405,7 @@ export function DashboardCalendar() {
                               const now = new Date();
                               const currentMinutes = (now.getHours() - WORK_START_HOUR) * 60 + now.getMinutes();
                               const currentTop = (currentMinutes / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
-                              
+
                               if (currentTop >= 0 && currentTop <= 100) {
                                 return (
                                   <div
@@ -419,13 +419,11 @@ export function DashboardCalendar() {
                               }
                               return null;
                             })()}
-                            
-                            {washerAppointments.map((appointment) => {
+
+                            {layoutAppointments.map((appointment) => {
                               const startDate = new Date(appointment.date);
                               const endDate = new Date(startDate);
-                              endDate.setMinutes(
-                                endDate.getMinutes() + appointment.service.durationMin
-                              );
+                              endDate.setMinutes(endDate.getMinutes() + appointment.service.durationMin);
 
                               const startMinutes =
                                 (startDate.getHours() - WORK_START_HOUR) * 60 + startDate.getMinutes();
@@ -442,21 +440,43 @@ export function DashboardCalendar() {
                                     setSelectedAppointment(appointment);
                                     setIsDetailsOpen(true);
                                   }}
-                                  className="absolute left-2 right-2 rounded-xl border-2 border-primary/40 bg-gradient-to-br from-primary/20 to-primary/10 p-3 text-sm shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02] z-10"
+                                  className="absolute rounded-xl border border-primary/30 bg-white/90 p-2 text-xs shadow-sm hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02] z-10 overflow-hidden flex flex-col gap-0.5 group"
                                   style={{
                                     top: `${top}%`,
-                                    height: `${Math.max(height, 12)}%`
+                                    height: `${Math.max(height, 12)}%`,
+                                    left: appointment.style.left,
+                                    width: appointment.style.width
                                   }}
                                 >
-                                  <p className="font-bold text-secondary-900 truncate">
-                                    {appointment.client.name}
-                                  </p>
-                                  <p className="text-xs text-secondary-600 font-medium">
-                                    {format(startDate, "HH:mm")} - {format(endDate, "HH:mm")}
-                                  </p>
-                                  <Badge className="mt-2 inline-block bg-gradient-to-r from-primary to-accent text-white text-xs font-bold shadow-md">
-                                    {appointment.service.name}
-                                  </Badge>
+                                  {/* Barra lateral colorida baseada no status (opcional, mas ajuda visualmente) */}
+                                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-xl" />
+
+                                  <div className="pl-2 flex flex-col h-full">
+                                    <div className="flex justify-between items-start">
+                                      <p className="text-[10px] font-bold text-secondary-500 leading-tight">
+                                        {format(startDate, "HH:mm")} - {format(endDate, "HH:mm")}
+                                      </p>
+                                    </div>
+
+                                    <p className="text-xs font-extrabold text-secondary-900 uppercase tracking-tight leading-tight mt-0.5 truncate">
+                                      {appointment.service.name}
+                                    </p>
+
+                                    <p className="text-[10px] text-secondary-600 truncate mt-0.5">
+                                      <span className="font-semibold">{appointment.client.vehicle}</span>
+                                      {appointment.client.plate && <span className="opacity-75"> ({appointment.client.plate})</span>}
+                                    </p>
+
+                                    <p className="text-[10px] text-secondary-500 truncate font-medium">
+                                      {appointment.client.name}
+                                    </p>
+
+                                    <div className="mt-auto pt-1 flex justify-end">
+                                      <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold bg-secondary-100 text-secondary-800 border border-secondary-200 uppercase tracking-wider">
+                                        {appointment.status}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               );
                             })}
@@ -476,18 +496,16 @@ export function DashboardCalendar() {
                       return (
                         <div
                           key={day.toISOString()}
-                          className={`border-r-2 border-primary/20 px-3 py-3 text-center ${
-                            isToday || isSelected
-                              ? "bg-gradient-to-br from-primary/20 to-primary/10"
-                              : "bg-gradient-to-br from-primary/10 to-primary/5"
-                          }`}
+                          className={`border-r-2 border-primary/20 px-3 py-3 text-center ${isToday || isSelected
+                            ? "bg-gradient-to-br from-primary/20 to-primary/10"
+                            : "bg-gradient-to-br from-primary/10 to-primary/5"
+                            }`}
                         >
                           <p className="text-xs uppercase tracking-wide font-bold text-secondary-600">
                             {format(day, "EEE", { locale: ptBR })}
                           </p>
-                          <p className={`text-lg font-bold ${
-                            isToday || isSelected ? "text-primary" : "text-secondary-900"
-                          }`}>
+                          <p className={`text-lg font-bold ${isToday || isSelected ? "text-primary" : "text-secondary-900"
+                            }`}>
                             {format(day, "dd")}
                           </p>
                         </div>
@@ -513,11 +531,10 @@ export function DashboardCalendar() {
                       const isSelected = isSameDay(day, anchorDate);
 
                       return (
-                        <div 
-                          key={day.toISOString()} 
-                          className={`relative border-r-2 border-primary/20 ${
-                            isToday || isSelected ? "bg-primary/5" : ""
-                          }`}
+                        <div
+                          key={day.toISOString()}
+                          className={`relative border-r-2 border-primary/20 ${isToday || isSelected ? "bg-primary/5" : ""
+                            }`}
                         >
                           {hours.map((hour) => (
                             <div
@@ -532,7 +549,7 @@ export function DashboardCalendar() {
                               const now = new Date();
                               const currentMinutes = (now.getHours() - WORK_START_HOUR) * 60 + now.getMinutes();
                               const currentTop = (currentMinutes / ((WORK_END_HOUR - WORK_START_HOUR) * 60)) * 100;
-                              
+
                               if (currentTop >= 0 && currentTop <= 100) {
                                 return (
                                   <div
@@ -546,7 +563,7 @@ export function DashboardCalendar() {
                               }
                               return null;
                             })()}
-                            
+
                             {dayAppointments.map((appointment) => {
                               const startDate = new Date(appointment.date);
                               const endDate = new Date(startDate);
@@ -638,7 +655,4 @@ export function DashboardCalendar() {
       />
     </div>
   );
-
 }
-
-

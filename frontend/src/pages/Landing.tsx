@@ -79,17 +79,21 @@ const processSteps = [
   }
 ];
 
+import washingImg from "../assets/images/washing.png";
+import interiorImg from "../assets/images/interior_detail.png";
+import polishingImg from "../assets/images/polishing.png";
+
 const gallery = [
   {
-    src: "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=800&q=80",
+    src: washingImg,
     alt: "Lavagem detalhada"
   },
   {
-    src: "https://images.unsplash.com/photo-1542042161784-26ab9e041e29?auto=format&fit=crop&w=800&q=80",
+    src: interiorImg,
     alt: "Interior higienizado"
   },
   {
-    src: "https://images.unsplash.com/photo-1515925756071-503a6979fd3e?auto=format&fit=crop&w=800&q=80",
+    src: polishingImg,
     alt: "Polimento profissional"
   }
 ];
@@ -114,7 +118,7 @@ export function LandingPage() {
       await contactApi.submit(formData);
       setSuccess(true);
       setFormData({ name: "", phone: "", vehicle: "", message: "" });
-      
+
       // Reset success message after 5 seconds
       setTimeout(() => setSuccess(false), 5000);
     } catch (err: any) {
@@ -146,7 +150,7 @@ export function LandingPage() {
           <div className="max-w-xl space-y-6">
             <div className="flex flex-col gap-4">
               <div className="text-5xl font-bold text-surface">Detail Prime</div>
-              <Badge variant="secondary" className="bg-primary/20 text-surface w-fit">
+              <Badge variant="secondary" className="bg-primary/20 text-primary-700 w-fit font-medium">
                 estética automotiva premium
               </Badge>
             </div>
@@ -213,12 +217,12 @@ export function LandingPage() {
           <div className="relative mx-auto w-full max-w-6xl px-6">
             <div className="grid gap-16 md:grid-cols-[1.1fr_0.9fr] md:items-center">
               <div className="space-y-8">
-                <Badge variant="secondary" className="bg-gradient-to-r from-primary/20 to-primary/10 text-primary border-primary/30">
-                Sobre nós
-              </Badge>
+                <Badge variant="secondary" className="bg-gradient-to-r from-primary/20 to-primary/10 text-primary-500 border-primary/30 font-medium">
+                  Sobre nós
+                </Badge>
                 <h2 className="text-4xl font-bold leading-tight text-secondary-900 md:text-5xl">
                   Cuidado artesanal com tecnologia para resultados{" "}
-                  <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent font-extrabold">
                     dignos de vitrine
                   </span>
                 </h2>
@@ -244,11 +248,12 @@ export function LandingPage() {
               </div>
               <div className="relative flex items-center justify-center">
                 <div className="absolute -left-8 -top-8 h-48 w-48 rounded-full bg-gradient-to-br from-primary/30 to-accent/20 blur-3xl" />
-                <div className="relative grid grid-cols-2 gap-4">
+                <div className="relative grid grid-cols-2 grid-rows-2 gap-4 h-[500px]">
                   {gallery.map((item, index) => (
                     <figure
                       key={item.alt}
-                      className={`group overflow-hidden rounded-3xl shadow-2xl ring-2 ring-primary/20 transition-all duration-500 hover:ring-primary/40 ${index % 2 === 0 ? "mt-8" : ""}`}
+                      className={`group overflow-hidden rounded-3xl shadow-2xl ring-2 ring-primary/20 transition-all duration-500 hover:ring-primary/40 ${index === 0 ? "row-span-2 h-full" : "h-full"
+                        }`}
                     >
                       <div className="relative h-full w-full overflow-hidden">
                         <img
@@ -272,26 +277,26 @@ export function LandingPage() {
             <div className="absolute left-1/4 top-0 h-64 w-64 rounded-full bg-primary/15 blur-3xl" />
             <div className="absolute right-1/4 bottom-0 h-72 w-72 rounded-full bg-accent/15 blur-3xl" />
           </div>
-          <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 md:flex-row md:items-start md:justify-between">
-            <div className="max-w-md space-y-6">
-              <Badge variant="secondary" className="bg-gradient-to-r from-accent/20 to-accent/10 text-accent border-accent/30">
+          <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-16 px-6">
+            <div className="mx-auto max-w-3xl space-y-6 text-center">
+              <Badge variant="secondary" className="bg-secondary-900 text-accent-200 border border-accent/30 font-bold mx-auto">
                 Experiência completa
               </Badge>
               <h2 className="text-4xl font-bold leading-tight text-secondary-900 md:text-5xl">
                 Um processo pensado para você{" "}
-                <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-accent-600 to-primary-600 bg-clip-text text-transparent font-extrabold">
                   acompanhar cada etapa
                 </span>
               </h2>
-              <p className="text-lg leading-relaxed text-secondary-700">
+              <p className="text-lg leading-relaxed text-secondary-700 mx-auto max-w-2xl">
                 Acompanhe seu veículo do diagnóstico à entrega com total transparência via aplicativo ou WhatsApp.
                 Nosso time envia notificações automáticas, fotos e orientações para o pós-serviço.
               </p>
-              <Button asChild className="shadow-lg shadow-primary/30">
+              <Button asChild className="shadow-lg shadow-primary/30 mx-auto">
                 <Link to="/agendar">Quero viver essa experiência</Link>
               </Button>
             </div>
-            <div className="grid flex-1 gap-6 md:grid-cols-3">
+            <div className="grid w-full gap-6 md:grid-cols-3">
               {processSteps.map((step, idx) => (
                 <div
                   key={step.title}
@@ -364,9 +369,9 @@ export function LandingPage() {
           <div className="relative mx-auto w-full max-w-6xl px-6">
             <div className="flex flex-col gap-8">
               <div className="text-center">
-                <Badge variant="secondary" className="mx-auto bg-gradient-to-r from-accent/20 to-primary/20 text-accent border-accent/30">
-              Depoimentos
-            </Badge>
+                <Badge variant="secondary" className="mx-auto bg-gradient-to-r from-accent/20 to-primary/20 text-accent-100 border-accent/30">
+                  Depoimentos
+                </Badge>
                 <h2 className="mt-4 text-4xl font-bold text-secondary-900 md:text-5xl">
                   Clientes que{" "}
                   <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">confiam</span>{" "}
@@ -375,8 +380,8 @@ export function LandingPage() {
               </div>
               <div className="grid gap-8 md:grid-cols-2">
                 {testimonials.map((testimonial, idx) => (
-                <blockquote
-                  key={testimonial.name}
+                  <blockquote
+                    key={testimonial.name}
                     className="group relative overflow-hidden rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-white to-primary/5 p-8 shadow-xl shadow-primary/10 transition-all duration-300 hover:-translate-y-2 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/20"
                   >
                     <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-primary/10 blur-3xl opacity-50 transition-opacity group-hover:opacity-100" />
@@ -388,10 +393,10 @@ export function LandingPage() {
                           <p className="font-bold text-secondary-900">{testimonial.name}</p>
                           <p className="text-sm text-secondary-500">{testimonial.role}</p>
                         </div>
-                  </footer>
+                      </footer>
                     </div>
-                </blockquote>
-              ))}
+                  </blockquote>
+                ))}
               </div>
             </div>
           </div>
