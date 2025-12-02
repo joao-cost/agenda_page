@@ -145,7 +145,7 @@ export function LandingPage() {
         <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 pt-24 pb-24 md:flex-row md:items-center md:justify-between">
           <div className="max-w-xl space-y-6">
             <div className="flex flex-col gap-4">
-              <img src="https://placehold.co/300x80.png" alt="DetailPrime" className="h-16 w-auto" />
+              <div className="text-5xl font-bold text-surface">Detail Prime</div>
               <Badge variant="secondary" className="bg-primary/20 text-surface w-fit">
                 estética automotiva premium
               </Badge>
@@ -606,9 +606,8 @@ export function LandingPage() {
             {/* Logo e Descrição */}
             <div className="md:col-span-2 space-y-4">
               <div className="flex items-center gap-3">
-                <img src="https://placehold.co/120x40.png" alt="DetailPrime" className="h-10 w-auto" />
-                <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  DetailPrime
+                <span className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Detail Prime
                 </span>
               </div>
               <p className="text-sm leading-relaxed text-surface/80 max-w-md">

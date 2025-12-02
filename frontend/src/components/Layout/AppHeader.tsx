@@ -46,9 +46,8 @@ export function AppHeader() {
           className="flex items-center gap-3"
           onClick={handleLinkClick}
         >
-          <img src="https://placehold.co/120x40.png" alt="DetailPrime" className="h-10 w-auto brightness-0 invert" />
-          <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hidden sm:inline">
-            DetailPrime
+          <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            Detail Prime
           </span>
         </Link>
 
@@ -173,9 +172,8 @@ export function AppHeader() {
                 className="flex items-center gap-3 pb-4 border-b border-primary/30"
                 onClick={handleLinkClick}
               >
-                <img src="https://placehold.co/120x40.png" alt="DetailPrime" className="h-10 w-auto brightness-0 invert" />
                 <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  DetailPrime
+                  Detail Prime
                 </span>
               </Link>
               {/* User Info (if authenticated) */}

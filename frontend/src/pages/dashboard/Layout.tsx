@@ -46,7 +46,9 @@ export function DashboardLayout() {
           <div className="flex items-center justify-between px-2">
             {isExpanded && (
               <Link to="/" className="flex items-center gap-3">
-                <img src="https://placehold.co/120x40.png" alt="DetailPrime" className="h-8 w-auto brightness-0 invert" />
+                <span className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Detail Prime
+                </span>
               </Link>
             )}
             <button
